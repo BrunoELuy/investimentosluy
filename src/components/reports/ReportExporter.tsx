@@ -236,28 +236,6 @@ export function ReportExporter({ calculations }: ReportExporterProps) {
       <CardContent className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Formato</Label>
-            <Select value={exportFormat} onValueChange={(v) => setExportFormat(v as ExportFormat)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="csv">
-                  <div className="flex items-center gap-2">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    CSV (Excel)
-                  </div>
-                </SelectItem>
-                <SelectItem value="pdf">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Texto (TXT)
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
             <Label>Tipo de Relatório</Label>
             <Select value={reportType} onValueChange={(v) => setReportType(v as ReportType)}>
               <SelectTrigger>
@@ -288,7 +266,7 @@ export function ReportExporter({ calculations }: ReportExporterProps) {
 
           <div className="space-y-2">
             <Label>Formato</Label>
-            <Select value={format} onValueChange={(v) => setFormat(v as ExportFormat)}>
+            <Select value={exportFormat} onValueChange={(v) => setExportFormat(v as ExportFormat)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
