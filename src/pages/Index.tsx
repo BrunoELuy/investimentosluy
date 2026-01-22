@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Calculator, BarChart3, LogOut, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -28,13 +28,14 @@ const Index = () => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
 
-  // Redirect to auth if not logged in
-  if (!authLoading && !user) {
-    navigate('/auth');
-    return null;
-  }
+  // Redirect to auth if not logged in - use useEffect to avoid breaking hooks
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [authLoading, user, navigate]);
 
-  if (authLoading || investmentsLoading) {
+  if (authLoading || investmentsLoading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="animate-pulse text-center">
