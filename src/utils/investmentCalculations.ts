@@ -1,5 +1,6 @@
 import { differenceInDays, parseISO, format, isAfter } from 'date-fns';
 import type { Investment, InvestmentCalculation, DashboardSummary } from '@/types/investment';
+import { calculateHistoricalCDIReturn } from './historicalCDIRates';
 
 // IR rates based on investment duration (only for CDB)
 const IR_RATES = [
@@ -35,14 +36,32 @@ export function calculateDailyRate(annualRate: number): number {
   return Math.pow(1 + annualRate / 100, 1 / 365) - 1;
 }
 
+/**
+ * Calculate gross return using historical CDI rates for CDI-indexed investments
+ * This provides accurate calculations for investments that started in the past
+ */
 export function calculateGrossReturn(
   initialValue: number,
   rateType: string,
   rateValue: number,
   days: number,
   cdiRate: number,
-  ipcaRate: number
+  ipcaRate: number,
+  startDate?: Date,
+  endDate?: Date
 ): number {
+  // For CDI-indexed investments with historical dates, use monthly historical rates
+  if (rateType === 'CDI' && startDate && endDate) {
+    const compoundFactor = calculateHistoricalCDIReturn(
+      startDate,
+      endDate,
+      rateValue, // This is the % of CDI (e.g., 110 for 110% CDI)
+      cdiRate
+    );
+    return initialValue * (compoundFactor - 1);
+  }
+  
+  // For other rate types or when dates aren't provided, use the simple calculation
   let annualRate: number;
   
   switch (rateType) {
@@ -84,15 +103,19 @@ export function calculateInvestment(
   const daysUntilMaturity = Math.max(differenceInDays(endDate, today), 0);
   const isMatured = isAfter(today, endDate);
   
-  // Calculate gross return
+  // Calculate gross return using historical rates when available
   const effectiveDays = Math.max(daysElapsed, 0);
+  const calculationEndDate = isMatured ? endDate : today;
+  
   const grossReturn = calculateGrossReturn(
     investment.initial_value,
     investment.rate_type,
     investment.rate_value,
     effectiveDays,
     cdiRate,
-    ipcaRate
+    ipcaRate,
+    startDate,
+    calculationEndDate
   );
   
   const currentValue = investment.initial_value + grossReturn;
