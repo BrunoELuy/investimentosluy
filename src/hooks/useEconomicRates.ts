@@ -8,7 +8,7 @@ interface BCBSeriesResponse {
 // Fetch CDI rate from Brazilian Central Bank API
 async function fetchCDIRate(): Promise<number> {
   try {
-    // Series 4389: CDI daily rate
+    // Series 4389: CDI annualized rate (already in % a.a.)
     const response = await fetch(
       'https://api.bcb.gov.br/dados/serie/bcdata.sgs.4389/dados/ultimos/1?formato=json'
     );
@@ -20,16 +20,14 @@ async function fetchCDIRate(): Promise<number> {
     const data: BCBSeriesResponse[] = await response.json();
     
     if (data && data.length > 0) {
-      // Convert daily rate to annual rate
-      const dailyRate = parseFloat(data[0].valor.replace(',', '.'));
-      const annualRate = (Math.pow(1 + dailyRate / 100, 252) - 1) * 100;
-      return annualRate;
+      // The API already returns the annualized rate, no conversion needed
+      return parseFloat(data[0].valor.replace(',', '.'));
     }
     
     throw new Error('No data returned');
   } catch (error) {
     console.warn('Failed to fetch CDI rate, using fallback:', error);
-    return 10.65; // Fallback CDI rate
+    return 14.90; // Fallback CDI rate (updated)
   }
 }
 
