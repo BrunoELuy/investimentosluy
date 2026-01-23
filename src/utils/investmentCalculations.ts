@@ -1,5 +1,5 @@
-import { differenceInDays, parseISO, format, isAfter } from 'date-fns';
-import type { Investment, InvestmentCalculation, DashboardSummary } from '@/types/investment';
+import { differenceInDays, parseISO, format, isAfter, isBefore } from 'date-fns';
+import type { Investment, InvestmentCalculation, DashboardSummary, InvestmentDeposit } from '@/types/investment';
 import { calculateHistoricalCDIReturn } from './historicalCDIRates';
 
 // IR rates based on investment duration (only for CDB)
@@ -86,10 +86,15 @@ export function calculateGrossReturn(
   return futureValue - initialValue;
 }
 
+/**
+ * Calculate investment with support for multiple deposits
+ * Each deposit is calculated independently from its date to the calculation date
+ */
 export function calculateInvestment(
   investment: Investment,
   cdiRate: number = 10.65,
-  ipcaRate: number = 4.5
+  ipcaRate: number = 4.5,
+  deposits: InvestmentDeposit[] = []
 ): InvestmentCalculation {
   const today = new Date();
   const startDate = parseISO(investment.start_date);
@@ -103,11 +108,11 @@ export function calculateInvestment(
   const daysUntilMaturity = Math.max(differenceInDays(endDate, today), 0);
   const isMatured = isAfter(today, endDate);
   
-  // Calculate gross return using historical rates when available
   const effectiveDays = Math.max(daysElapsed, 0);
   const calculationEndDate = isMatured ? endDate : today;
   
-  const grossReturn = calculateGrossReturn(
+  // Calculate return for initial investment
+  let totalGrossReturn = calculateGrossReturn(
     investment.initial_value,
     investment.rate_type,
     investment.rate_value,
@@ -118,8 +123,34 @@ export function calculateInvestment(
     calculationEndDate
   );
   
-  const currentValue = investment.initial_value + grossReturn;
-  const grossReturnPercent = (grossReturn / investment.initial_value) * 100;
+  // Calculate return for each deposit
+  for (const deposit of deposits) {
+    const depositDate = parseISO(deposit.deposit_date);
+    
+    // Only calculate if deposit is before calculation end date
+    if (isBefore(depositDate, calculationEndDate)) {
+      const depositDays = Math.max(differenceInDays(calculationEndDate, depositDate), 0);
+      
+      if (depositDays > 0) {
+        const depositReturn = calculateGrossReturn(
+          deposit.amount,
+          investment.rate_type,
+          investment.rate_value,
+          depositDays,
+          cdiRate,
+          ipcaRate,
+          depositDate,
+          calculationEndDate
+        );
+        totalGrossReturn += depositReturn;
+      }
+    }
+  }
+  
+  // Total invested = initial value + all deposits
+  const totalInvested = investment.initial_value + deposits.reduce((sum, d) => sum + d.amount, 0);
+  const currentValue = totalInvested + totalGrossReturn;
+  const grossReturnPercent = (totalGrossReturn / totalInvested) * 100;
   
   // Calculate taxes (LCA is tax-exempt for individuals)
   let irRate = 0;
@@ -127,26 +158,39 @@ export function calculateInvestment(
   let iofAmount = 0;
   
   if (investment.type === 'CDB') {
-    // IOF (only in first 30 days)
+    // IOF (only in first 30 days of initial investment)
     if (effectiveDays < 30) {
       const iofRate = getIOFRate(effectiveDays);
-      iofAmount = grossReturn * iofRate;
+      // IOF applies proportionally to the portion of return from early investments
+      const initialReturn = calculateGrossReturn(
+        investment.initial_value,
+        investment.rate_type,
+        investment.rate_value,
+        effectiveDays,
+        cdiRate,
+        ipcaRate,
+        startDate,
+        calculationEndDate
+      );
+      iofAmount = initialReturn * iofRate;
     }
     
     // IR (applied to gross return minus IOF)
+    // Use the average weighted days for IR calculation
     irRate = getIRRate(effectiveDays);
-    irAmount = (grossReturn - iofAmount) * irRate;
+    irAmount = (totalGrossReturn - iofAmount) * irRate;
   }
   
-  const netReturn = grossReturn - irAmount - iofAmount;
-  const currentNetValue = investment.initial_value + netReturn;
-  const netReturnPercent = (netReturn / investment.initial_value) * 100;
+  const netReturn = totalGrossReturn - irAmount - iofAmount;
+  const currentNetValue = totalInvested + netReturn;
+  const netReturnPercent = (netReturn / totalInvested) * 100;
   
   return {
     investment,
+    deposits,
     daysElapsed: effectiveDays,
     totalDays,
-    grossReturn,
+    grossReturn: totalGrossReturn,
     grossReturnPercent,
     netReturn,
     netReturnPercent,
@@ -157,6 +201,7 @@ export function calculateInvestment(
     iofAmount,
     daysUntilMaturity,
     isMatured,
+    totalInvested,
   };
 }
 
@@ -166,7 +211,7 @@ export function calculateDashboardSummary(
   const activeCalcs = calculations.filter(c => c.investment.is_active);
   
   const totalInvested = activeCalcs.reduce(
-    (sum, c) => sum + c.investment.initial_value,
+    (sum, c) => sum + c.totalInvested,
     0
   );
   

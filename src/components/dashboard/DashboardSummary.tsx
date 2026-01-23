@@ -69,23 +69,23 @@ export function DashboardSummary({ summary }: DashboardSummaryProps) {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
             <Percent className="h-4 w-4" />
-            Composição
+            Quantidade
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex gap-4">
             <div>
               <p className="text-xl font-bold text-chart-1">{summary.cdbCount}</p>
-              <p className="text-xs text-muted-foreground">CDB</p>
+              <p className="text-xs text-muted-foreground">{summary.cdbCount === 1 ? 'CDB' : 'CDBs'}</p>
             </div>
             <div>
               <p className="text-xl font-bold text-chart-2">{summary.lcaCount}</p>
-              <p className="text-xs text-muted-foreground">LCA</p>
+              <p className="text-xs text-muted-foreground">{summary.lcaCount === 1 ? 'LCA' : 'LCAs'}</p>
             </div>
             {summary.maturedCount > 0 && (
               <div>
                 <p className="text-xl font-bold text-warning">{summary.maturedCount}</p>
-                <p className="text-xs text-muted-foreground">Vencidos</p>
+                <p className="text-xs text-muted-foreground">{summary.maturedCount === 1 ? 'Vencido' : 'Vencidos'}</p>
               </div>
             )}
           </div>

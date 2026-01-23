@@ -79,6 +79,47 @@ export type Database = {
           },
         ]
       }
+      investment_deposits: {
+        Row: {
+          amount: number
+          created_at: string
+          deposit_date: string
+          id: string
+          investment_id: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          deposit_date: string
+          id?: string
+          investment_id: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          deposit_date?: string
+          id?: string
+          investment_id?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investment_deposits_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "investments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       investments: {
         Row: {
           created_at: string

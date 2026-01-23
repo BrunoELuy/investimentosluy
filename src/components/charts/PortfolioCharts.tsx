@@ -91,10 +91,10 @@ export function PortfolioCharts({ calculations }: PortfolioChartsProps) {
       // Simulate growth based on elapsed days
       const factor = (6 - i) / 6;
       const grossValue = activeCalcs.reduce((sum, c) => {
-        return sum + c.investment.initial_value + (c.grossReturn * factor);
+        return sum + c.totalInvested + (c.grossReturn * factor);
       }, 0);
       const netValue = activeCalcs.reduce((sum, c) => {
-        return sum + c.investment.initial_value + (c.netReturn * factor);
+        return sum + c.totalInvested + (c.netReturn * factor);
       }, 0);
 
       data.push({
@@ -182,16 +182,17 @@ export function PortfolioCharts({ calculations }: PortfolioChartsProps) {
           <CardTitle>Distribuição por Instituição</CardTitle>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={{}} className="h-[250px] w-full">
-            <PieChart>
+          <ChartContainer config={{}} className="h-[300px] w-full">
+            <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
               <Pie
                 data={institutionDistribution}
                 cx="50%"
                 cy="50%"
-                outerRadius={100}
+                outerRadius={90}
                 paddingAngle={2}
                 dataKey="value"
                 label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                labelLine={{ strokeWidth: 1 }}
               >
                 {institutionDistribution.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.fill} />

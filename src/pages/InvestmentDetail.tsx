@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useInvestment, useUpdateInvestment, useDeleteInvestment } from '@/hooks/useInvestments';
 import { useEconomicRates } from '@/hooks/useEconomicRates';
+import { useDeposits } from '@/hooks/useDeposits';
 import { InvestmentDetails } from '@/components/investments/InvestmentDetails';
 import { InvestmentForm } from '@/components/investments/InvestmentForm';
 import { calculateInvestment } from '@/utils/investmentCalculations';
@@ -20,6 +21,7 @@ export default function InvestmentDetail() {
   const [isEditing, setIsEditing] = useState(false);
 
   const { data: investment, isLoading } = useInvestment(id || '');
+  const { data: deposits = [] } = useDeposits(id || '');
   const { data: rates } = useEconomicRates();
   const cdiRate = rates?.cdi ?? 10.65;
   const ipcaRate = rates?.ipca ?? 4.5;
@@ -28,8 +30,8 @@ export default function InvestmentDetail() {
 
   const calculation = useMemo(() => {
     if (!investment) return null;
-    return calculateInvestment(investment, cdiRate, ipcaRate);
-  }, [investment, cdiRate, ipcaRate]);
+    return calculateInvestment(investment, cdiRate, ipcaRate, deposits);
+  }, [investment, cdiRate, ipcaRate, deposits]);
 
   const handleUpdate = async (data: InvestmentFormData) => {
     if (!id) return;
