@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import type { InvestmentCalculation } from '@/types/investment';
 import { formatCurrency, formatPercent, formatRateValue, getIRRate } from '@/utils/investmentCalculations';
+import { DepositsList } from './DepositsList';
 
 interface InvestmentDetailsProps {
   calculation: InvestmentCalculation;
@@ -42,7 +43,9 @@ interface InvestmentDetailsProps {
 export function InvestmentDetails({ calculation, onBack, onEdit, onDelete }: InvestmentDetailsProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const { 
-    investment, 
+    investment,
+    deposits,
+    totalInvested,
     grossReturn, 
     grossReturnPercent,
     netReturn, 
@@ -182,9 +185,14 @@ export function InvestmentDetails({ calculation, onBack, onEdit, onDelete }: Inv
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
               <DollarSign className="h-4 w-4" />
-              <span className="text-sm">Valor Aplicado</span>
+              <span className="text-sm">Total Investido</span>
             </div>
-            <p className="text-2xl font-bold">{formatCurrency(investment.initial_value)}</p>
+            <p className="text-2xl font-bold">{formatCurrency(totalInvested)}</p>
+            {deposits.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Inicial: {formatCurrency(investment.initial_value)} + {deposits.length} aporte{deposits.length > 1 ? 's' : ''}
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -294,6 +302,21 @@ export function InvestmentDetails({ calculation, onBack, onEdit, onDelete }: Inv
           </CardContent>
         </Card>
       )}
+
+      {/* Deposits List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Aportes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DepositsList
+            investmentId={investment.id}
+            investmentStartDate={investment.start_date}
+            investmentEndDate={investment.end_date}
+            initialValue={investment.initial_value}
+          />
+        </CardContent>
+      </Card>
 
       {/* Notes */}
       {investment.notes && (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Calculator, BarChart3, LogOut, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { PortfolioCharts } from '@/components/charts/PortfolioCharts';
 import { ReportExporter } from '@/components/reports/ReportExporter';
 import { useAuth } from '@/hooks/useAuth';
 import { useInvestments, useCreateInvestment, useDeleteInvestment, useUpdateInvestment } from '@/hooks/useInvestments';
+import { useAllDeposits } from '@/hooks/useDeposits';
 import { calculateInvestment } from '@/utils/investmentCalculations';
 import type { Investment, InvestmentCalculation, DashboardSummary as DashboardSummaryType, InvestmentFormData } from '@/types/investment';
 
@@ -22,6 +23,10 @@ const Index = () => {
   const createInvestment = useCreateInvestment();
   const updateInvestment = useUpdateInvestment();
   const deleteInvestment = useDeleteInvestment();
+  
+  // Load all deposits for all investments
+  const investmentIds = useMemo(() => (investments || []).map(inv => inv.id), [investments]);
+  const { data: depositsByInvestment = {} } = useAllDeposits(investmentIds);
   
   const [selectedCalculation, setSelectedCalculation] = useState<InvestmentCalculation | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -47,13 +52,13 @@ const Index = () => {
   }
 
   const calculations: InvestmentCalculation[] = (investments || []).map(inv => 
-    calculateInvestment(inv)
+    calculateInvestment(inv, 10.65, 4.5, depositsByInvestment[inv.id] || [])
   );
 
   // Compute dashboard summary
   const summary: DashboardSummaryType = calculations.reduce(
     (acc, calc) => ({
-      totalInvested: acc.totalInvested + calc.investment.initial_value,
+      totalInvested: acc.totalInvested + calc.totalInvested,
       totalGrossReturn: acc.totalGrossReturn + calc.grossReturn,
       totalNetReturn: acc.totalNetReturn + calc.netReturn,
       totalGrossPercent: 0, // will calculate below

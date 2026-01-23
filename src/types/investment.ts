@@ -19,6 +19,17 @@ export interface Investment {
   updated_at: string;
 }
 
+export interface InvestmentDeposit {
+  id: string;
+  investment_id: string;
+  user_id: string;
+  amount: number;
+  deposit_date: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface EconomicRate {
   id: string;
   rate_type: string;
@@ -41,6 +52,7 @@ export interface InvestmentAlert {
 // Calculated investment data
 export interface InvestmentCalculation {
   investment: Investment;
+  deposits: InvestmentDeposit[];
   daysElapsed: number;
   totalDays: number;
   grossReturn: number;
@@ -54,6 +66,7 @@ export interface InvestmentCalculation {
   iofAmount: number;
   daysUntilMaturity: number;
   isMatured: boolean;
+  totalInvested: number;
 }
 
 // Form data for creating/editing investments
@@ -66,6 +79,13 @@ export interface InvestmentFormData {
   rate_value: number;
   start_date: string;
   end_date: string;
+  notes?: string;
+  deposits?: DepositFormData[];
+}
+
+export interface DepositFormData {
+  amount: number;
+  deposit_date: string;
   notes?: string;
 }
 
