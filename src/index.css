@@ -2,29 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-/* InvestTracker Design System - Colorful Investment Theme */
+/* InvestTracker Design System - Premium Purple Theme */
 
 @layer base {
   :root {
-    --background: 220 20% 97%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 270 20% 98%;
+    --foreground: 270 50% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 270 50% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 270 50% 10%;
 
-    --primary: 152 76% 36%;
+    --primary: 262 83% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 270 30% 96%;
+    --secondary-foreground: 270 50% 20%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 270 20% 95%;
+    --muted-foreground: 270 15% 45%;
 
-    --accent: 38 92% 50%;
+    --accent: 280 70% 50%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
@@ -41,55 +41,55 @@
 
     --profit: 152 76% 36%;
     --loss: 0 84.2% 60.2%;
-    --neutral: 210 100% 50%;
+    --neutral: 262 83% 58%;
 
     --cdb: 262 83% 58%;
     --cdb-foreground: 0 0% 100%;
-    --lca: 152 76% 36%;
+    --lca: 280 70% 50%;
     --lca-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 152 76% 36%;
+    --border: 270 20% 90%;
+    --input: 270 20% 90%;
+    --ring: 262 83% 58%;
 
     --radius: 0.75rem;
 
-    --chart-1: 152 76% 36%;
-    --chart-2: 262 83% 58%;
+    --chart-1: 262 83% 58%;
+    --chart-2: 280 70% 50%;
     --chart-3: 38 92% 50%;
     --chart-4: 210 100% 50%;
-    --chart-5: 0 84.2% 60.2%;
+    --chart-5: 320 70% 50%;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 152 76% 36%;
+    --sidebar-background: 270 20% 98%;
+    --sidebar-foreground: 270 30% 30%;
+    --sidebar-primary: 262 83% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 152 76% 36%;
+    --sidebar-accent: 270 20% 95%;
+    --sidebar-accent-foreground: 270 50% 20%;
+    --sidebar-border: 270 20% 90%;
+    --sidebar-ring: 262 83% 58%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 270 50% 5%;
+    --foreground: 270 10% 95%;
 
-    --card: 222.2 50% 10%;
-    --card-foreground: 210 40% 98%;
+    --card: 270 40% 10%;
+    --card-foreground: 270 10% 95%;
 
-    --popover: 222.2 50% 10%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 270 40% 10%;
+    --popover-foreground: 270 10% 95%;
 
-    --primary: 152 76% 45%;
+    --primary: 262 83% 65%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 270 30% 15%;
+    --secondary-foreground: 270 10% 90%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 270 30% 15%;
+    --muted-foreground: 270 15% 60%;
 
-    --accent: 38 92% 50%;
+    --accent: 280 70% 60%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 30.6%;
@@ -106,31 +106,31 @@
 
     --profit: 152 76% 45%;
     --loss: 0 62.8% 50%;
-    --neutral: 210 100% 60%;
+    --neutral: 262 83% 65%;
 
     --cdb: 262 83% 65%;
     --cdb-foreground: 0 0% 100%;
-    --lca: 152 76% 45%;
+    --lca: 280 70% 60%;
     --lca-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 152 76% 45%;
+    --border: 270 30% 20%;
+    --input: 270 30% 20%;
+    --ring: 262 83% 65%;
 
-    --chart-1: 152 76% 45%;
-    --chart-2: 262 83% 65%;
+    --chart-1: 262 83% 65%;
+    --chart-2: 280 70% 60%;
     --chart-3: 38 92% 50%;
     --chart-4: 210 100% 60%;
-    --chart-5: 0 62.8% 50%;
+    --chart-5: 320 70% 55%;
 
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 152 76% 45%;
+    --sidebar-background: 270 50% 8%;
+    --sidebar-foreground: 270 10% 90%;
+    --sidebar-primary: 262 83% 65%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 152 76% 45%;
+    --sidebar-accent: 270 30% 15%;
+    --sidebar-accent-foreground: 270 10% 90%;
+    --sidebar-border: 270 30% 20%;
+    --sidebar-ring: 262 83% 65%;
   }
 }
 
@@ -173,7 +173,11 @@
   }
 
   .gradient-lca {
-    background: linear-gradient(135deg, hsl(var(--lca)) 0%, hsl(152 76% 28%) 100%);
+    background: linear-gradient(135deg, hsl(var(--lca)) 0%, hsl(280 70% 40%) 100%);
+  }
+
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(262 83% 58%) 0%, hsl(280 70% 50%) 100%);
   }
 
   .text-profit {
