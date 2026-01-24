@@ -2,30 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
-/* InvestTracker Design System - Premium Purple Theme */
+/* InvestTracker Design System - Golden Yellow Theme */
 
 @layer base {
   :root {
-    --background: 270 20% 98%;
-    --foreground: 270 50% 10%;
+    --background: 45 30% 97%;
+    --foreground: 40 50% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 270 50% 10%;
+    --card-foreground: 40 50% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 270 50% 10%;
+    --popover-foreground: 40 50% 10%;
 
-    --primary: 262 83% 58%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 45 93% 47%;
+    --primary-foreground: 40 50% 10%;
 
-    --secondary: 270 30% 96%;
-    --secondary-foreground: 270 50% 20%;
+    --secondary: 45 30% 94%;
+    --secondary-foreground: 40 50% 20%;
 
-    --muted: 270 20% 95%;
-    --muted-foreground: 270 15% 45%;
+    --muted: 45 20% 94%;
+    --muted-foreground: 40 15% 45%;
 
-    --accent: 280 70% 50%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 38 92% 50%;
+    --accent-foreground: 40 50% 10%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
@@ -34,63 +34,63 @@
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning-foreground: 40 50% 10%;
 
     --info: 210 100% 50%;
     --info-foreground: 0 0% 100%;
 
     --profit: 152 76% 36%;
     --loss: 0 84.2% 60.2%;
-    --neutral: 262 83% 58%;
+    --neutral: 45 93% 47%;
 
-    --cdb: 262 83% 58%;
-    --cdb-foreground: 0 0% 100%;
-    --lca: 280 70% 50%;
-    --lca-foreground: 0 0% 100%;
+    --cdb: 45 93% 47%;
+    --cdb-foreground: 40 50% 10%;
+    --lca: 38 85% 55%;
+    --lca-foreground: 40 50% 10%;
 
-    --border: 270 20% 90%;
-    --input: 270 20% 90%;
-    --ring: 262 83% 58%;
+    --border: 45 25% 88%;
+    --input: 45 25% 88%;
+    --ring: 45 93% 47%;
 
     --radius: 0.75rem;
 
-    --chart-1: 262 83% 58%;
-    --chart-2: 280 70% 50%;
-    --chart-3: 38 92% 50%;
+    --chart-1: 45 93% 47%;
+    --chart-2: 38 85% 55%;
+    --chart-3: 28 90% 50%;
     --chart-4: 210 100% 50%;
-    --chart-5: 320 70% 50%;
+    --chart-5: 15 85% 55%;
 
-    --sidebar-background: 270 20% 98%;
-    --sidebar-foreground: 270 30% 30%;
-    --sidebar-primary: 262 83% 58%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 270 20% 95%;
-    --sidebar-accent-foreground: 270 50% 20%;
-    --sidebar-border: 270 20% 90%;
-    --sidebar-ring: 262 83% 58%;
+    --sidebar-background: 45 30% 97%;
+    --sidebar-foreground: 40 30% 30%;
+    --sidebar-primary: 45 93% 47%;
+    --sidebar-primary-foreground: 40 50% 10%;
+    --sidebar-accent: 45 25% 93%;
+    --sidebar-accent-foreground: 40 50% 20%;
+    --sidebar-border: 45 25% 88%;
+    --sidebar-ring: 45 93% 47%;
   }
 
   .dark {
-    --background: 270 50% 5%;
-    --foreground: 270 10% 95%;
+    --background: 40 30% 6%;
+    --foreground: 45 20% 95%;
 
-    --card: 270 40% 10%;
-    --card-foreground: 270 10% 95%;
+    --card: 40 25% 10%;
+    --card-foreground: 45 20% 95%;
 
-    --popover: 270 40% 10%;
-    --popover-foreground: 270 10% 95%;
+    --popover: 40 25% 10%;
+    --popover-foreground: 45 20% 95%;
 
-    --primary: 262 83% 65%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 45 93% 55%;
+    --primary-foreground: 40 50% 10%;
 
-    --secondary: 270 30% 15%;
-    --secondary-foreground: 270 10% 90%;
+    --secondary: 40 25% 15%;
+    --secondary-foreground: 45 20% 90%;
 
-    --muted: 270 30% 15%;
-    --muted-foreground: 270 15% 60%;
+    --muted: 40 25% 15%;
+    --muted-foreground: 45 15% 55%;
 
-    --accent: 280 70% 60%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 38 92% 55%;
+    --accent-foreground: 40 50% 10%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
@@ -98,39 +98,39 @@
     --success: 152 76% 45%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 40 50% 10%;
 
     --info: 210 100% 60%;
     --info-foreground: 0 0% 100%;
 
     --profit: 152 76% 45%;
     --loss: 0 62.8% 50%;
-    --neutral: 262 83% 65%;
+    --neutral: 45 93% 55%;
 
-    --cdb: 262 83% 65%;
-    --cdb-foreground: 0 0% 100%;
-    --lca: 280 70% 60%;
-    --lca-foreground: 0 0% 100%;
+    --cdb: 45 93% 55%;
+    --cdb-foreground: 40 50% 10%;
+    --lca: 38 85% 60%;
+    --lca-foreground: 40 50% 10%;
 
-    --border: 270 30% 20%;
-    --input: 270 30% 20%;
-    --ring: 262 83% 65%;
+    --border: 40 25% 18%;
+    --input: 40 25% 18%;
+    --ring: 45 93% 55%;
 
-    --chart-1: 262 83% 65%;
-    --chart-2: 280 70% 60%;
-    --chart-3: 38 92% 50%;
+    --chart-1: 45 93% 55%;
+    --chart-2: 38 85% 60%;
+    --chart-3: 28 90% 55%;
     --chart-4: 210 100% 60%;
-    --chart-5: 320 70% 55%;
+    --chart-5: 15 85% 60%;
 
-    --sidebar-background: 270 50% 8%;
-    --sidebar-foreground: 270 10% 90%;
-    --sidebar-primary: 262 83% 65%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 270 30% 15%;
-    --sidebar-accent-foreground: 270 10% 90%;
-    --sidebar-border: 270 30% 20%;
-    --sidebar-ring: 262 83% 65%;
+    --sidebar-background: 40 30% 8%;
+    --sidebar-foreground: 45 20% 90%;
+    --sidebar-primary: 45 93% 55%;
+    --sidebar-primary-foreground: 40 50% 10%;
+    --sidebar-accent: 40 25% 15%;
+    --sidebar-accent-foreground: 45 20% 90%;
+    --sidebar-border: 40 25% 18%;
+    --sidebar-ring: 45 93% 55%;
   }
 }
 
@@ -169,15 +169,15 @@
   }
 
   .gradient-cdb {
-    background: linear-gradient(135deg, hsl(var(--cdb)) 0%, hsl(262 83% 45%) 100%);
+    background: linear-gradient(135deg, hsl(var(--cdb)) 0%, hsl(45 93% 40%) 100%);
   }
 
   .gradient-lca {
-    background: linear-gradient(135deg, hsl(var(--lca)) 0%, hsl(280 70% 40%) 100%);
+    background: linear-gradient(135deg, hsl(var(--lca)) 0%, hsl(38 85% 45%) 100%);
   }
 
   .gradient-primary {
-    background: linear-gradient(135deg, hsl(262 83% 58%) 0%, hsl(280 70% 50%) 100%);
+    background: linear-gradient(135deg, hsl(45 93% 47%) 0%, hsl(38 92% 50%) 100%);
   }
 
   .text-profit {
