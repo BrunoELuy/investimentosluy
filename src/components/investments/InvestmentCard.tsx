@@ -70,7 +70,7 @@ export function InvestmentCard({ calculation, onClick }: InvestmentCardProps) {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Valor Líquido Atual</p>
-            <p className="font-semibold text-primary">{formatCurrency(currentNetValue)}</p>
+            <p className="font-semibold text-success">{formatCurrency(currentNetValue)}</p>
           </div>
         </div>
 
