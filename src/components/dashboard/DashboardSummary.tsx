@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, DollarSign, PiggyBank, Percent, Calendar } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, PiggyBank } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { DashboardSummary as DashboardSummaryType } from '@/types/investment';
 import { formatCurrency, formatPercent } from '@/utils/investmentCalculations';
@@ -68,7 +68,7 @@ export function DashboardSummary({ summary }: DashboardSummaryProps) {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
-            <Percent className="h-4 w-4" />
+            <PiggyBank className="h-4 w-4" />
             Quantidade
           </CardTitle>
         </CardHeader>
