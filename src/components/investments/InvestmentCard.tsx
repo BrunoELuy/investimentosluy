@@ -55,7 +55,7 @@ export function InvestmentCard({ calculation, onClick }: InvestmentCardProps) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-xs text-muted-foreground">Valor Aplicado</p>
-            <p className="font-medium">{formatCurrency(investment.initial_value)}</p>
+            <p className="font-medium">{formatCurrency(calculation.totalInvested)}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Rentabilidade</p>
