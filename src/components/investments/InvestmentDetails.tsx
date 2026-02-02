@@ -151,7 +151,9 @@ export function InvestmentDetails({ calculation, onBack, onEdit, onDelete }: Inv
             </div>
             <div className="text-right">
               <p className="text-sm text-muted-foreground">Valor Líquido Atual</p>
-              <p className="text-3xl font-bold text-primary">{formatCurrency(currentNetValue)}</p>
+              <p className={`text-3xl font-bold ${investment.type === 'LCA' ? 'text-[hsl(199,89%,48%)]' : 'text-success'}`}>
+                {formatCurrency(currentNetValue)}
+              </p>
               <div className={`flex items-center justify-end gap-1 ${isPositive ? 'text-success' : 'text-destructive'}`}>
                 {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                 <span className="font-semibold">
@@ -170,7 +172,10 @@ export function InvestmentDetails({ calculation, onBack, onEdit, onDelete }: Inv
               </span>
               <span className="text-muted-foreground">{daysElapsed} de {totalDays} dias</span>
             </div>
-            <Progress value={progressPercent} className="h-3" />
+            <Progress 
+              value={progressPercent} 
+              className={`h-3 ${investment.type === 'LCA' ? '[&>div]:bg-[hsl(199,89%,48%)]' : ''}`} 
+            />
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Início</span>
               <span>Vencimento: {format(new Date(investment.end_date), "dd/MM/yyyy", { locale: ptBR })}</span>
