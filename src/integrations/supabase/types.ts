@@ -120,6 +120,39 @@ export type Database = {
           },
         ]
       }
+      investment_goals: {
+        Row: {
+          created_at: string
+          estimated_cdi_rate: number
+          id: string
+          name: string
+          target_amount: number
+          target_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          estimated_cdi_rate?: number
+          id?: string
+          name: string
+          target_amount: number
+          target_date: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          estimated_cdi_rate?: number
+          id?: string
+          name?: string
+          target_amount?: number
+          target_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       investments: {
         Row: {
           created_at: string
