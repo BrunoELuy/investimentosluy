@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Calculator, BarChart3, LogOut, TrendingUp } from 'lucide-react';
+import { Plus, Calculator, BarChart3, LogOut, TrendingUp, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -10,6 +10,7 @@ import { InvestmentForm } from '@/components/investments/InvestmentForm';
 import { InvestmentDetails } from '@/components/investments/InvestmentDetails';
 import { PortfolioCharts } from '@/components/charts/PortfolioCharts';
 import { ReportExporter } from '@/components/reports/ReportExporter';
+import { GoalsTab } from '@/components/goals/GoalsTab';
 import { useAuth } from '@/hooks/useAuth';
 import { useInvestments, useCreateInvestment, useDeleteInvestment, useUpdateInvestment } from '@/hooks/useInvestments';
 import { useAllDeposits } from '@/hooks/useDeposits';
@@ -164,6 +165,10 @@ const Index = () => {
           <div className="flex items-center justify-between">
             <TabsList>
               <TabsTrigger value="investments">Investimentos</TabsTrigger>
+              <TabsTrigger value="goals" className="gap-1">
+                <Target className="h-4 w-4" />
+                Objetivos
+              </TabsTrigger>
               <TabsTrigger value="charts">Gráficos</TabsTrigger>
               <TabsTrigger value="reports">Relatórios</TabsTrigger>
             </TabsList>
@@ -220,6 +225,10 @@ const Index = () => {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="goals">
+            <GoalsTab totalInvested={summary.totalInvested} currentCdiRate={10.65} />
           </TabsContent>
 
           <TabsContent value="charts">
