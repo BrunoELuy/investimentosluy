@@ -70,7 +70,9 @@ export function InvestmentCard({ calculation, onClick }: InvestmentCardProps) {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Valor Líquido Atual</p>
-            <p className="font-semibold text-success">{formatCurrency(currentNetValue)}</p>
+            <p className={`font-semibold ${investment.type === 'LCA' ? 'text-[hsl(199,89%,48%)]' : 'text-success'}`}>
+              {formatCurrency(currentNetValue)}
+            </p>
           </div>
         </div>
 
@@ -106,7 +108,10 @@ export function InvestmentCard({ calculation, onClick }: InvestmentCardProps) {
             <span>{daysElapsed} de {totalDays} dias</span>
             <span>{format(new Date(investment.end_date), 'dd/MM/yy', { locale: ptBR })}</span>
           </div>
-          <Progress value={progressPercent} className="h-2" />
+          <Progress 
+            value={progressPercent} 
+            className={`h-2 ${investment.type === 'LCA' ? '[&>div]:bg-[hsl(199,89%,48%)]' : ''}`} 
+          />
         </div>
       </CardContent>
     </Card>
