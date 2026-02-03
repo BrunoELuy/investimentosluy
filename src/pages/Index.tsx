@@ -11,6 +11,7 @@ import { InvestmentDetails } from '@/components/investments/InvestmentDetails';
 import { PortfolioCharts } from '@/components/charts/PortfolioCharts';
 import { ReportExporter } from '@/components/reports/ReportExporter';
 import { GoalsTab } from '@/components/goals/GoalsTab';
+import { OnlineStatusIndicator } from '@/components/OnlineStatusIndicator';
 import { useAuth } from '@/hooks/useAuth';
 import { useInvestments, useCreateInvestment, useDeleteInvestment, useUpdateInvestment } from '@/hooks/useInvestments';
 import { useAllDeposits } from '@/hooks/useDeposits';
@@ -141,6 +142,7 @@ const Index = () => {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <OnlineStatusIndicator />
             <Button variant="outline" size="sm" onClick={() => navigate('/simulator')}>
               <Calculator className="h-4 w-4 mr-2" />
               Simulador

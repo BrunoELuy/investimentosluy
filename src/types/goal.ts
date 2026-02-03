@@ -24,4 +24,6 @@ export interface GoalCalculation {
   projectedEarnings: number;
   currentProgress: number;
   progressPercent: number;
+  futureValueOfCurrentInvestments: number;
+  earningsFromCurrentInvestments: number;
 }
