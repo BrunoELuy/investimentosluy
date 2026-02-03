@@ -47,7 +47,9 @@ export function GoalDetails({ calculation, onBack, onEdit, onDelete }: GoalDetai
     totalContributions,
     projectedEarnings,
     currentProgress,
-    progressPercent
+    progressPercent,
+    futureValueOfCurrentInvestments,
+    earningsFromCurrentInvestments
   } = calculation;
 
   const today = new Date();
@@ -157,7 +159,7 @@ export function GoalDetails({ calculation, onBack, onEdit, onDelete }: GoalDetai
       </Card>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
@@ -187,25 +189,44 @@ export function GoalDetails({ calculation, onBack, onEdit, onDelete }: GoalDetai
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
-              <TrendingUp className="h-4 w-4" />
-              <span className="text-sm">Rendimento Projetado</span>
-            </div>
-            <p className="text-2xl font-bold text-success">{formatCurrency(projectedEarnings)}</p>
-            <p className="text-xs text-muted-foreground">
-              Juros compostos estimados
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-muted-foreground mb-2">
               <Calculator className="h-4 w-4" />
               <span className="text-sm">Taxa CDI</span>
             </div>
             <p className="text-2xl font-bold">{goal.estimated_cdi_rate}%</p>
             <p className="text-xs text-muted-foreground">
               Estimativa anual
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Earnings Breakdown */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="border-success/30 bg-success/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-muted-foreground mb-2">
+              <TrendingUp className="h-4 w-4 text-success" />
+              <span className="text-sm">Rendimento do Investido Atual</span>
+            </div>
+            <p className="text-2xl font-bold text-success">{formatCurrency(earningsFromCurrentInvestments)}</p>
+            <p className="text-xs text-muted-foreground">
+              Seus {formatCurrency(currentProgress)} renderão até a meta
+            </p>
+            <p className="text-sm font-medium mt-2">
+              Valor projetado: {formatCurrency(futureValueOfCurrentInvestments)}
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-muted-foreground mb-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <span className="text-sm">Rendimento Total Projetado</span>
+            </div>
+            <p className="text-2xl font-bold text-primary">{formatCurrency(projectedEarnings)}</p>
+            <p className="text-xs text-muted-foreground">
+              Juros compostos de tudo (atual + novos aportes)
             </p>
           </CardContent>
         </Card>
@@ -233,15 +254,30 @@ export function GoalDetails({ calculation, onBack, onEdit, onDelete }: GoalDetai
           
           <Separator />
           
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <p className="text-sm font-medium mb-2">Como atingir sua meta:</p>
-            <p className="text-muted-foreground text-sm">
-              Investindo <span className="font-bold text-primary">{formatCurrency(monthlyContribution)}</span> por mês 
-              durante <span className="font-bold">{monthsRemaining} meses</span>, 
-              com rendimento de <span className="font-bold">{goal.estimated_cdi_rate}% a.a.</span>, 
-              você terá aproximadamente <span className="font-bold text-success">{formatCurrency(projectedEarnings)}</span> em 
-              juros compostos, totalizando sua meta de <span className="font-bold">{formatCurrency(goal.target_amount)}</span>.
-            </p>
+          <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+            <p className="text-sm font-medium mb-2">📊 Projeção detalhada:</p>
+            <div className="text-muted-foreground text-sm space-y-2">
+              <p>
+                <span className="font-medium text-foreground">1. Seu investimento atual:</span> {formatCurrency(currentProgress)} 
+                → renderá <span className="font-bold text-success">{formatCurrency(earningsFromCurrentInvestments)}</span> em {monthsRemaining} meses
+                → totalizando <span className="font-bold">{formatCurrency(futureValueOfCurrentInvestments)}</span>
+              </p>
+              {monthlyContribution > 0 ? (
+                <p>
+                  <span className="font-medium text-foreground">2. Novos aportes:</span> {formatCurrency(monthlyContribution)}/mês 
+                  × {monthsRemaining} meses = <span className="font-bold">{formatCurrency(totalContributions)}</span> + rendimentos
+                </p>
+              ) : (
+                <p>
+                  <span className="font-medium text-foreground">2. Novos aportes:</span> <span className="text-success font-bold">Nenhum necessário!</span> 
+                  Seus investimentos atuais já atingirão a meta.
+                </p>
+              )}
+              <p className="pt-2 border-t">
+                <span className="font-medium text-foreground">Total na data alvo:</span>{' '}
+                <span className="font-bold text-primary">{formatCurrency(goal.target_amount)}</span>
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>

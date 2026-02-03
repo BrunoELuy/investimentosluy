@@ -2,50 +2,94 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Investment, InvestmentFormData, InvestmentFilters } from '@/types/investment';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { 
+  getLocalInvestments, 
+  saveLocalInvestment, 
+  saveLocalInvestments,
+  deleteLocalInvestment,
+  addToSyncQueue,
+  isOnline 
+} from '@/lib/offlineDb';
 
 export function useInvestments(filters?: InvestmentFilters) {
+  const { user } = useAuth();
+  
   return useQuery({
-    queryKey: ['investments', filters],
+    queryKey: ['investments', filters, user?.id],
     queryFn: async (): Promise<Investment[]> => {
-      let query = supabase
-        .from('investments')
-        .select('*')
-        .order('created_at', { ascending: false });
+      if (!user) return [];
+      
+      // Try online first
+      if (isOnline()) {
+        try {
+          let query = supabase
+            .from('investments')
+            .select('*')
+            .order('created_at', { ascending: false });
 
+          if (filters?.type && filters.type !== 'ALL') {
+            query = query.eq('type', filters.type);
+          }
+
+          if (filters?.institution) {
+            query = query.ilike('institution', `%${filters.institution}%`);
+          }
+
+          if (filters?.rateType && filters.rateType !== 'ALL') {
+            query = query.eq('rate_type', filters.rateType);
+          }
+
+          if (filters?.status === 'active') {
+            query = query.eq('is_active', true);
+          } else if (filters?.status === 'matured') {
+            query = query.lt('end_date', new Date().toISOString().split('T')[0]);
+          }
+
+          if (filters?.searchTerm) {
+            query = query.or(`name.ilike.%${filters.searchTerm}%,institution.ilike.%${filters.searchTerm}%`);
+          }
+
+          const { data, error } = await query;
+
+          if (error) throw error;
+
+          const investments = (data || []).map(inv => ({
+            ...inv,
+            initial_value: Number(inv.initial_value),
+            rate_value: Number(inv.rate_value),
+          })) as Investment[];
+          
+          // Cache to local DB
+          await saveLocalInvestments(investments);
+          
+          return investments;
+        } catch {
+          // Fall through to offline
+        }
+      }
+      
+      // Offline mode - use local DB
+      const localData = await getLocalInvestments(user.id);
+      let filtered = localData;
+      
       if (filters?.type && filters.type !== 'ALL') {
-        query = query.eq('type', filters.type);
+        filtered = filtered.filter(inv => inv.type === filters.type);
       }
-
-      if (filters?.institution) {
-        query = query.ilike('institution', `%${filters.institution}%`);
-      }
-
-      if (filters?.rateType && filters.rateType !== 'ALL') {
-        query = query.eq('rate_type', filters.rateType);
-      }
-
       if (filters?.status === 'active') {
-        query = query.eq('is_active', true);
-      } else if (filters?.status === 'matured') {
-        query = query.lt('end_date', new Date().toISOString().split('T')[0]);
+        filtered = filtered.filter(inv => inv.is_active);
       }
-
       if (filters?.searchTerm) {
-        query = query.or(`name.ilike.%${filters.searchTerm}%,institution.ilike.%${filters.searchTerm}%`);
+        const term = filters.searchTerm.toLowerCase();
+        filtered = filtered.filter(inv => 
+          inv.name.toLowerCase().includes(term) || 
+          inv.institution.toLowerCase().includes(term)
+        );
       }
-
-      const { data, error } = await query;
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return (data || []).map(inv => ({
-        ...inv,
-        initial_value: Number(inv.initial_value),
-        rate_value: Number(inv.rate_value),
-      })) as Investment[];
+      
+      return filtered;
     },
+    enabled: !!user,
   });
 }
 
@@ -85,26 +129,47 @@ export function useCreateInvestment() {
         throw new Error('Usuário não autenticado');
       }
 
-      const { data, error } = await supabase
-        .from('investments')
-        .insert({
-          ...formData,
-          user_id: user.id,
-        })
-        .select()
-        .single();
+      const investmentData = {
+        ...formData,
+        user_id: user.id,
+        id: crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_active: true,
+      };
 
-      if (error) {
-        throw new Error(error.message);
+      if (isOnline()) {
+        const { data, error } = await supabase
+          .from('investments')
+          .insert(investmentData)
+          .select()
+          .single();
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        // Save to local DB
+        await saveLocalInvestment(data as Investment);
+        return data;
+      } else {
+        // Offline mode - save locally and queue for sync
+        await saveLocalInvestment(investmentData as Investment);
+        await addToSyncQueue({
+          table: 'investments',
+          operation: 'create',
+          data: investmentData,
+        });
+        return investmentData;
       }
-
-      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investments'] });
       toast({
         title: 'Investimento criado!',
-        description: 'Seu investimento foi adicionado com sucesso.',
+        description: isOnline() ? 
+          'Seu investimento foi adicionado com sucesso.' :
+          'Salvo localmente. Será sincronizado quando reconectar.',
       });
     },
     onError: (error: Error) => {
@@ -160,20 +225,34 @@ export function useDeleteInvestment() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('investments')
-        .delete()
-        .eq('id', id);
+      if (isOnline()) {
+        const { error } = await supabase
+          .from('investments')
+          .delete()
+          .eq('id', id);
 
-      if (error) {
-        throw new Error(error.message);
+        if (error) {
+          throw new Error(error.message);
+        }
+      } else {
+        // Queue for sync
+        await addToSyncQueue({
+          table: 'investments',
+          operation: 'delete',
+          data: { id },
+        });
       }
+      
+      // Delete from local DB
+      await deleteLocalInvestment(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investments'] });
       toast({
         title: 'Investimento removido',
-        description: 'O investimento foi excluído com sucesso.',
+        description: isOnline() ? 
+          'O investimento foi excluído com sucesso.' :
+          'Removido localmente. Será sincronizado quando reconectar.',
       });
     },
     onError: (error: Error) => {

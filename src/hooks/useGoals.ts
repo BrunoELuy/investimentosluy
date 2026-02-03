@@ -3,6 +3,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import type { InvestmentGoal, GoalFormData } from '@/types/goal';
 import { useToast } from '@/hooks/use-toast';
+import {
+  getLocalGoals,
+  saveLocalGoal,
+  saveLocalGoals,
+  deleteLocalGoal,
+  addToSyncQueue,
+  isOnline
+} from '@/lib/offlineDb';
 
 export function useGoals() {
   const { user } = useAuth();
@@ -13,22 +21,34 @@ export function useGoals() {
     queryFn: async () => {
       if (!user) return [];
       
-      const { data, error } = await supabase
-        .from('investment_goals')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('target_date', { ascending: true });
+      // Try online first
+      if (isOnline()) {
+        try {
+          const { data, error } = await supabase
+            .from('investment_goals')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('target_date', { ascending: true });
 
-      if (error) {
-        toast({
-          title: 'Erro ao carregar objetivos',
-          description: error.message,
-          variant: 'destructive',
-        });
-        throw error;
+          if (error) throw error;
+          
+          // Cache to local DB
+          if (data) {
+            await saveLocalGoals(data as InvestmentGoal[]);
+          }
+
+          return data as InvestmentGoal[];
+        } catch (err) {
+          toast({
+            title: 'Erro ao carregar objetivos',
+            description: 'Usando dados locais.',
+            variant: 'destructive',
+          });
+        }
       }
-
-      return data as InvestmentGoal[];
+      
+      // Offline mode - use local DB
+      return getLocalGoals(user.id);
     },
     enabled: !!user,
   });
@@ -43,26 +63,46 @@ export function useCreateGoal() {
     mutationFn: async (data: GoalFormData) => {
       if (!user) throw new Error('Usuário não autenticado');
 
-      const { data: goal, error } = await supabase
-        .from('investment_goals')
-        .insert({
-          user_id: user.id,
-          name: data.name,
-          target_amount: data.target_amount,
-          target_date: data.target_date,
-          estimated_cdi_rate: data.estimated_cdi_rate,
-        })
-        .select()
-        .single();
+      const goalData = {
+        id: crypto.randomUUID(),
+        user_id: user.id,
+        name: data.name,
+        target_amount: data.target_amount,
+        target_date: data.target_date,
+        estimated_cdi_rate: data.estimated_cdi_rate,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-      if (error) throw error;
-      return goal;
+      if (isOnline()) {
+        const { data: goal, error } = await supabase
+          .from('investment_goals')
+          .insert(goalData)
+          .select()
+          .single();
+
+        if (error) throw error;
+        
+        await saveLocalGoal(goal as InvestmentGoal);
+        return goal;
+      } else {
+        // Offline mode
+        await saveLocalGoal(goalData as InvestmentGoal);
+        await addToSyncQueue({
+          table: 'investment_goals',
+          operation: 'create',
+          data: goalData,
+        });
+        return goalData;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals'] });
       toast({
         title: 'Objetivo criado!',
-        description: 'Seu objetivo de investimento foi cadastrado com sucesso.',
+        description: isOnline() ?
+          'Seu objetivo de investimento foi cadastrado com sucesso.' :
+          'Salvo localmente. Será sincronizado quando reconectar.',
       });
     },
     onError: (error: Error) => {
@@ -81,26 +121,44 @@ export function useUpdateGoal() {
 
   return useMutation({
     mutationFn: async ({ id, ...data }: GoalFormData & { id: string }) => {
-      const { data: goal, error } = await supabase
-        .from('investment_goals')
-        .update({
-          name: data.name,
-          target_amount: data.target_amount,
-          target_date: data.target_date,
-          estimated_cdi_rate: data.estimated_cdi_rate,
-        })
-        .eq('id', id)
-        .select()
-        .single();
+      const updateData = {
+        name: data.name,
+        target_amount: data.target_amount,
+        target_date: data.target_date,
+        estimated_cdi_rate: data.estimated_cdi_rate,
+        updated_at: new Date().toISOString(),
+      };
 
-      if (error) throw error;
-      return goal;
+      if (isOnline()) {
+        const { data: goal, error } = await supabase
+          .from('investment_goals')
+          .update(updateData)
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        
+        await saveLocalGoal(goal as InvestmentGoal);
+        return goal;
+      } else {
+        // Offline mode - update local and queue
+        const fullData = { id, ...updateData };
+        await addToSyncQueue({
+          table: 'investment_goals',
+          operation: 'update',
+          data: fullData,
+        });
+        return fullData;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals'] });
       toast({
         title: 'Objetivo atualizado!',
-        description: 'Seu objetivo foi atualizado com sucesso.',
+        description: isOnline() ?
+          'Seu objetivo foi atualizado com sucesso.' :
+          'Salvo localmente. Será sincronizado quando reconectar.',
       });
     },
     onError: (error: Error) => {
@@ -119,18 +177,31 @@ export function useDeleteGoal() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('investment_goals')
-        .delete()
-        .eq('id', id);
+      if (isOnline()) {
+        const { error } = await supabase
+          .from('investment_goals')
+          .delete()
+          .eq('id', id);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        // Queue for sync
+        await addToSyncQueue({
+          table: 'investment_goals',
+          operation: 'delete',
+          data: { id },
+        });
+      }
+      
+      await deleteLocalGoal(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals'] });
       toast({
         title: 'Objetivo excluído',
-        description: 'O objetivo foi removido com sucesso.',
+        description: isOnline() ?
+          'O objetivo foi removido com sucesso.' :
+          'Removido localmente. Será sincronizado quando reconectar.',
       });
     },
     onError: (error: Error) => {
