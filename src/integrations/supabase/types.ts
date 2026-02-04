@@ -228,6 +228,39 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_investments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          ticker: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          ticker?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          ticker?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
