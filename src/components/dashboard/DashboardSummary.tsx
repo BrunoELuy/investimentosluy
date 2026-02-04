@@ -73,7 +73,7 @@ export function DashboardSummary({ summary }: DashboardSummaryProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-          <div className="flex gap-3 sm:gap-4">
+          <div className="flex gap-2 sm:gap-4 flex-wrap">
             <div className="min-w-0">
               <p className="text-base sm:text-xl font-bold text-chart-1">{summary.cdbCount}</p>
               <p className="text-xs text-muted-foreground">{summary.cdbCount === 1 ? 'CDB' : 'CDBs'}</p>
@@ -82,6 +82,12 @@ export function DashboardSummary({ summary }: DashboardSummaryProps) {
               <p className="text-base sm:text-xl font-bold text-chart-2">{summary.lcaCount}</p>
               <p className="text-xs text-muted-foreground">{summary.lcaCount === 1 ? 'LCA' : 'LCAs'}</p>
             </div>
+            {summary.stockCount > 0 && (
+              <div className="min-w-0">
+                <p className="text-base sm:text-xl font-bold text-[hsl(280,70%,50%)]">{summary.stockCount}</p>
+                <p className="text-xs text-muted-foreground">{summary.stockCount === 1 ? 'Ação' : 'Ações'}</p>
+              </div>
+            )}
             {summary.maturedCount > 0 && (
               <div className="min-w-0">
                 <p className="text-base sm:text-xl font-bold text-warning">{summary.maturedCount}</p>

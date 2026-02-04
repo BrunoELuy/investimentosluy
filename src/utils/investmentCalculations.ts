@@ -100,6 +100,29 @@ export function calculateInvestment(
   const startDate = parseISO(investment.start_date);
   const endDate = parseISO(investment.end_date);
   
+  // For stocks (ACAO), we don't calculate returns - just show invested value
+  if (investment.type === 'ACAO') {
+    const totalInvested = investment.initial_value + deposits.reduce((sum, d) => sum + d.amount, 0);
+    return {
+      investment,
+      deposits,
+      daysElapsed: differenceInDays(today, startDate),
+      totalDays: 0,
+      grossReturn: 0,
+      grossReturnPercent: 0,
+      netReturn: 0,
+      netReturnPercent: 0,
+      currentValue: totalInvested,
+      currentNetValue: totalInvested,
+      irRate: 0,
+      irAmount: 0,
+      iofAmount: 0,
+      daysUntilMaturity: 0,
+      isMatured: false,
+      totalInvested,
+    };
+  }
+  
   const totalDays = differenceInDays(endDate, startDate);
   const daysElapsed = Math.min(
     differenceInDays(today, startDate),
@@ -241,6 +264,7 @@ export function calculateDashboardSummary(
     totalNetPercent,
     cdbCount: calculations.filter(c => c.investment.type === 'CDB').length,
     lcaCount: calculations.filter(c => c.investment.type === 'LCA').length,
+    stockCount: calculations.filter(c => c.investment.type === 'ACAO').length,
     activeCount: activeCalcs.length,
     maturedCount: calculations.filter(c => c.isMatured).length,
   };

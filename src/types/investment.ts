@@ -1,6 +1,6 @@
 // Investment types
-export type InvestmentType = 'CDB' | 'LCA';
-export type RateType = 'CDI' | 'IPCA' | 'PREFIXADO';
+export type InvestmentType = 'CDB' | 'LCA' | 'ACAO';
+export type RateType = 'CDI' | 'IPCA' | 'PREFIXADO' | 'NONE';
 
 export interface Investment {
   id: string;
@@ -17,6 +17,9 @@ export interface Investment {
   notes?: string;
   created_at: string;
   updated_at: string;
+  // Stock-specific fields
+  ticker?: string | null;
+  quantity?: number | null;
 }
 
 export interface InvestmentDeposit {
@@ -81,6 +84,9 @@ export interface InvestmentFormData {
   end_date: string;
   notes?: string;
   deposits?: DepositFormData[];
+  // Stock-specific fields
+  ticker?: string;
+  quantity?: number;
 }
 
 export interface DepositFormData {
@@ -98,6 +104,7 @@ export interface DashboardSummary {
   totalNetPercent: number;
   cdbCount: number;
   lcaCount: number;
+  stockCount: number;
   activeCount: number;
   maturedCount: number;
 }
