@@ -163,9 +163,11 @@ export type Database = {
           is_active: boolean
           name: string
           notes: string | null
+          quantity: number | null
           rate_type: string
           rate_value: number
           start_date: string
+          ticker: string | null
           type: string
           updated_at: string
           user_id: string
@@ -179,9 +181,11 @@ export type Database = {
           is_active?: boolean
           name: string
           notes?: string | null
+          quantity?: number | null
           rate_type: string
           rate_value: number
           start_date: string
+          ticker?: string | null
           type: string
           updated_at?: string
           user_id: string
@@ -195,9 +199,11 @@ export type Database = {
           is_active?: boolean
           name?: string
           notes?: string | null
+          quantity?: number | null
           rate_type?: string
           rate_value?: number
           start_date?: string
+          ticker?: string | null
           type?: string
           updated_at?: string
           user_id?: string

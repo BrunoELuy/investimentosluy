@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Calculator, BarChart3, LogOut, TrendingUp, Target, Briefcase } from 'lucide-react';
+import { Plus, Calculator, BarChart3, LogOut, TrendingUp, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -11,7 +11,6 @@ import { InvestmentDetails } from '@/components/investments/InvestmentDetails';
 import { PortfolioCharts } from '@/components/charts/PortfolioCharts';
 import { ReportExporter } from '@/components/reports/ReportExporter';
 import { GoalsTab } from '@/components/goals/GoalsTab';
-import { StocksTab } from '@/components/stocks/StocksTab';
 import { OnlineStatusIndicator } from '@/components/OnlineStatusIndicator';
 import { useAuth } from '@/hooks/useAuth';
 import { useInvestments, useCreateInvestment, useDeleteInvestment, useUpdateInvestment } from '@/hooks/useInvestments';
@@ -68,6 +67,7 @@ const Index = () => {
       totalNetPercent: 0,
       cdbCount: acc.cdbCount + (calc.investment.type === 'CDB' ? 1 : 0),
       lcaCount: acc.lcaCount + (calc.investment.type === 'LCA' ? 1 : 0),
+      stockCount: acc.stockCount + (calc.investment.type === 'ACAO' ? 1 : 0),
       activeCount: acc.activeCount + (!calc.isMatured ? 1 : 0),
       maturedCount: acc.maturedCount + (calc.isMatured ? 1 : 0),
     }),
@@ -79,6 +79,7 @@ const Index = () => {
       totalNetPercent: 0,
       cdbCount: 0,
       lcaCount: 0,
+      stockCount: 0,
       activeCount: 0,
       maturedCount: 0,
     }
@@ -174,10 +175,6 @@ const Index = () => {
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
             <TabsList className="w-full sm:w-auto overflow-x-auto flex-shrink-0">
               <TabsTrigger value="investments" className="text-xs sm:text-sm">Investimentos</TabsTrigger>
-              <TabsTrigger value="stocks" className="gap-1 text-xs sm:text-sm">
-                <Briefcase className="h-3 w-3 sm:h-4 sm:w-4" />
-                Ações
-              </TabsTrigger>
               <TabsTrigger value="goals" className="gap-1 text-xs sm:text-sm">
                 <Target className="h-3 w-3 sm:h-4 sm:w-4" />
                 Objetivos
@@ -238,10 +235,6 @@ const Index = () => {
                 ))}
               </div>
             )}
-          </TabsContent>
-
-          <TabsContent value="stocks">
-            <StocksTab totalFixedIncome={summary.totalInvested} />
           </TabsContent>
 
           <TabsContent value="goals">
