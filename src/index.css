@@ -139,6 +139,11 @@
     @apply border-border;
   }
 
+  html, body {
+    @apply overflow-x-hidden;
+    max-width: 100vw;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
@@ -148,6 +153,11 @@
   html {
     -webkit-tap-highlight-color: transparent;
     scroll-behavior: smooth;
+  }
+
+  #root {
+    @apply overflow-x-hidden;
+    max-width: 100vw;
   }
 
   /* Safe area for mobile devices */

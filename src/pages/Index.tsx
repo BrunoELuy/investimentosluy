@@ -131,48 +131,54 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden w-full max-w-full">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+        <div className="container flex h-16 items-center justify-between px-4">
+          <div className="flex items-center gap-2 min-w-0">
+            <TrendingUp className="h-5 w-5 text-primary flex-shrink-0" />
+            <h1 className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent truncate">
               InvestTracker
             </h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             <OnlineStatusIndicator />
-            <Button variant="outline" size="sm" onClick={() => navigate('/simulator')}>
+            <Button variant="outline" size="sm" onClick={() => navigate('/simulator')} className="hidden sm:flex">
               <Calculator className="h-4 w-4 mr-2" />
               Simulador
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/comparator')}>
+            <Button variant="outline" size="icon" onClick={() => navigate('/simulator')} className="sm:hidden">
+              <Calculator className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/comparator')} className="hidden sm:flex">
               <BarChart3 className="h-4 w-4 mr-2" />
               Comparador
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <Button variant="outline" size="icon" onClick={() => navigate('/comparator')} className="sm:hidden">
+              <BarChart3 className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleLogout}>
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="container py-6 space-y-6">
+      <main className="container py-4 sm:py-6 space-y-4 sm:space-y-6 px-4 overflow-x-hidden">
         {/* Dashboard Summary */}
         <DashboardSummary summary={summary} />
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="investments" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <TabsList>
-              <TabsTrigger value="investments">Investimentos</TabsTrigger>
-              <TabsTrigger value="goals" className="gap-1">
-                <Target className="h-4 w-4" />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+            <TabsList className="w-full sm:w-auto overflow-x-auto flex-shrink-0">
+              <TabsTrigger value="investments" className="text-xs sm:text-sm">Investimentos</TabsTrigger>
+              <TabsTrigger value="goals" className="gap-1 text-xs sm:text-sm">
+                <Target className="h-3 w-3 sm:h-4 sm:w-4" />
                 Objetivos
               </TabsTrigger>
-              <TabsTrigger value="charts">Gráficos</TabsTrigger>
-              <TabsTrigger value="reports">Relatórios</TabsTrigger>
+              <TabsTrigger value="charts" className="text-xs sm:text-sm">Gráficos</TabsTrigger>
+              <TabsTrigger value="reports" className="text-xs sm:text-sm">Relatórios</TabsTrigger>
             </TabsList>
 
             <Dialog open={isFormOpen} onOpenChange={(open) => {
