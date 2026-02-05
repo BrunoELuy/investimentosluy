@@ -32,6 +32,7 @@ import {
 import type { InvestmentCalculation } from '@/types/investment';
 import { formatCurrency, formatPercent, formatRateValue, getIRRate } from '@/utils/investmentCalculations';
 import { DepositsList } from './DepositsList';
+import { StockDetails } from './StockDetails';
 
 interface InvestmentDetailsProps {
   calculation: InvestmentCalculation;
@@ -42,6 +43,19 @@ interface InvestmentDetailsProps {
 
 export function InvestmentDetails({ calculation, onBack, onEdit, onDelete }: InvestmentDetailsProps) {
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // If it's a stock, render the specialized StockDetails component
+  if (calculation.investment.type === 'ACAO') {
+    return (
+      <StockDetails
+        calculation={calculation}
+        onBack={onBack}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
+    );
+  }
+
   const { 
     investment,
     deposits,

@@ -1,13 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Calculator, BarChart3, LogOut, TrendingUp, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DashboardSummary } from '@/components/dashboard/DashboardSummary';
-import { InvestmentCard } from '@/components/investments/InvestmentCard';
 import { InvestmentForm } from '@/components/investments/InvestmentForm';
 import { InvestmentDetails } from '@/components/investments/InvestmentDetails';
+import { DraggableInvestmentList } from '@/components/investments/DraggableInvestmentList';
 import { PortfolioCharts } from '@/components/charts/PortfolioCharts';
 import { ReportExporter } from '@/components/reports/ReportExporter';
 import { GoalsTab } from '@/components/goals/GoalsTab';
@@ -34,14 +34,131 @@ const Index = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
+  const [investmentOrder, setInvestmentOrder] = useState<string[]>([]);
 
-  // Redirect to auth if not logged in - use useEffect to avoid breaking hooks
+  // Redirect to auth if not logged in
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
     }
   }, [authLoading, user, navigate]);
 
+  // Load saved order on mount
+  useEffect(() => {
+    const savedOrder = localStorage.getItem('investmentOrder');
+    if (savedOrder) {
+      try {
+        setInvestmentOrder(JSON.parse(savedOrder));
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
+  }, []);
+
+  // Calculate investments with deposits
+  const baseCalculations: InvestmentCalculation[] = useMemo(() => 
+    (investments || []).map(inv => 
+      calculateInvestment(inv, 10.65, 4.5, depositsByInvestment[inv.id] || [])
+    ), [investments, depositsByInvestment]
+  );
+
+  // Sort calculations by custom order if available
+  const calculations = useMemo(() => {
+    if (investmentOrder.length === 0) return baseCalculations;
+    return [...baseCalculations].sort((a, b) => {
+      const indexA = investmentOrder.indexOf(a.investment.id);
+      const indexB = investmentOrder.indexOf(b.investment.id);
+      if (indexA === -1 && indexB === -1) return 0;
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      return indexA - indexB;
+    });
+  }, [baseCalculations, investmentOrder]);
+
+  // Compute dashboard summary
+  const summary: DashboardSummaryType = useMemo(() => {
+    const result = calculations.reduce(
+      (acc, calc) => ({
+        totalInvested: acc.totalInvested + calc.totalInvested,
+        totalGrossReturn: acc.totalGrossReturn + calc.grossReturn,
+        totalNetReturn: acc.totalNetReturn + calc.netReturn,
+        totalGrossPercent: 0,
+        totalNetPercent: 0,
+        cdbCount: acc.cdbCount + (calc.investment.type === 'CDB' ? 1 : 0),
+        lcaCount: acc.lcaCount + (calc.investment.type === 'LCA' ? 1 : 0),
+        stockCount: acc.stockCount + (calc.investment.type === 'ACAO' ? 1 : 0),
+        activeCount: acc.activeCount + (!calc.isMatured ? 1 : 0),
+        maturedCount: acc.maturedCount + (calc.isMatured ? 1 : 0),
+      }),
+      {
+        totalInvested: 0,
+        totalGrossReturn: 0,
+        totalNetReturn: 0,
+        totalGrossPercent: 0,
+        totalNetPercent: 0,
+        cdbCount: 0,
+        lcaCount: 0,
+        stockCount: 0,
+        activeCount: 0,
+        maturedCount: 0,
+      }
+    );
+
+    if (result.totalInvested > 0) {
+      result.totalGrossPercent = (result.totalGrossReturn / result.totalInvested) * 100;
+      result.totalNetPercent = (result.totalNetReturn / result.totalInvested) * 100;
+    }
+
+    return result;
+  }, [calculations]);
+
+  const handleInvestmentClick = useCallback((calc: InvestmentCalculation) => {
+    setSelectedCalculation(calc);
+    setIsDetailsOpen(true);
+  }, []);
+
+  const handleReorder = useCallback((reorderedIds: string[]) => {
+    setInvestmentOrder(reorderedIds);
+    localStorage.setItem('investmentOrder', JSON.stringify(reorderedIds));
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    await signOut();
+    navigate('/auth');
+  }, [signOut, navigate]);
+
+  const handleCreateInvestment = useCallback(async (data: InvestmentFormData) => {
+    await createInvestment.mutateAsync(data);
+    setIsFormOpen(false);
+    setEditingInvestment(null);
+  }, [createInvestment]);
+
+  const handleUpdateInvestment = useCallback(async (data: InvestmentFormData) => {
+    if (editingInvestment) {
+      await updateInvestment.mutateAsync({ id: editingInvestment.id, ...data });
+      setIsFormOpen(false);
+      setEditingInvestment(null);
+      setIsDetailsOpen(false);
+    }
+  }, [editingInvestment, updateInvestment]);
+
+  const handleDeleteInvestment = useCallback(async () => {
+    if (selectedCalculation) {
+      await deleteInvestment.mutateAsync(selectedCalculation.investment.id);
+      setIsDetailsOpen(false);
+      setSelectedCalculation(null);
+    }
+  }, [selectedCalculation, deleteInvestment]);
+
+  const handleEdit = useCallback(() => {
+    if (selectedCalculation) {
+      setEditingInvestment(selectedCalculation.investment);
+      setIsDetailsOpen(false);
+      setIsFormOpen(true);
+    }
+  }, [selectedCalculation]);
+
+  // Show loading state
   if (authLoading || investmentsLoading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -52,85 +169,6 @@ const Index = () => {
       </div>
     );
   }
-
-  const calculations: InvestmentCalculation[] = (investments || []).map(inv => 
-    calculateInvestment(inv, 10.65, 4.5, depositsByInvestment[inv.id] || [])
-  );
-
-  // Compute dashboard summary
-  const summary: DashboardSummaryType = calculations.reduce(
-    (acc, calc) => ({
-      totalInvested: acc.totalInvested + calc.totalInvested,
-      totalGrossReturn: acc.totalGrossReturn + calc.grossReturn,
-      totalNetReturn: acc.totalNetReturn + calc.netReturn,
-      totalGrossPercent: 0, // will calculate below
-      totalNetPercent: 0,
-      cdbCount: acc.cdbCount + (calc.investment.type === 'CDB' ? 1 : 0),
-      lcaCount: acc.lcaCount + (calc.investment.type === 'LCA' ? 1 : 0),
-      stockCount: acc.stockCount + (calc.investment.type === 'ACAO' ? 1 : 0),
-      activeCount: acc.activeCount + (!calc.isMatured ? 1 : 0),
-      maturedCount: acc.maturedCount + (calc.isMatured ? 1 : 0),
-    }),
-    {
-      totalInvested: 0,
-      totalGrossReturn: 0,
-      totalNetReturn: 0,
-      totalGrossPercent: 0,
-      totalNetPercent: 0,
-      cdbCount: 0,
-      lcaCount: 0,
-      stockCount: 0,
-      activeCount: 0,
-      maturedCount: 0,
-    }
-  );
-
-  // Calculate percentages
-  if (summary.totalInvested > 0) {
-    summary.totalGrossPercent = (summary.totalGrossReturn / summary.totalInvested) * 100;
-    summary.totalNetPercent = (summary.totalNetReturn / summary.totalInvested) * 100;
-  }
-
-  const handleInvestmentClick = (calc: InvestmentCalculation) => {
-    setSelectedCalculation(calc);
-    setIsDetailsOpen(true);
-  };
-
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/auth');
-  };
-
-  const handleCreateInvestment = async (data: InvestmentFormData) => {
-    await createInvestment.mutateAsync(data);
-    setIsFormOpen(false);
-    setEditingInvestment(null);
-  };
-
-  const handleUpdateInvestment = async (data: InvestmentFormData) => {
-    if (editingInvestment) {
-      await updateInvestment.mutateAsync({ id: editingInvestment.id, ...data });
-      setIsFormOpen(false);
-      setEditingInvestment(null);
-      setIsDetailsOpen(false);
-    }
-  };
-
-  const handleDeleteInvestment = async () => {
-    if (selectedCalculation) {
-      await deleteInvestment.mutateAsync(selectedCalculation.investment.id);
-      setIsDetailsOpen(false);
-      setSelectedCalculation(null);
-    }
-  };
-
-  const handleEdit = () => {
-    if (selectedCalculation) {
-      setEditingInvestment(selectedCalculation.investment);
-      setIsDetailsOpen(false);
-      setIsFormOpen(true);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden w-full max-w-full">
@@ -225,15 +263,11 @@ const Index = () => {
                 </Button>
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {calculations.map(calc => (
-                  <InvestmentCard
-                    key={calc.investment.id}
-                    calculation={calc}
-                    onClick={() => handleInvestmentClick(calc)}
-                  />
-                ))}
-              </div>
+              <DraggableInvestmentList
+                calculations={calculations}
+                onReorder={handleReorder}
+                onInvestmentClick={handleInvestmentClick}
+              />
             )}
           </TabsContent>
 
