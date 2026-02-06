@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { InvestmentCard } from './InvestmentCard';
 import type { InvestmentCalculation } from '@/types/investment';
 
@@ -86,11 +88,19 @@ export function DraggableInvestmentList({
   }, [draggingId]);
 
   const handleCardClick = useCallback((calc: InvestmentCalculation) => {
-    // Only trigger click if not dragging
     if (!isHolding && !draggingId) {
       onInvestmentClick(calc);
     }
   }, [isHolding, draggingId, onInvestmentClick]);
+
+  const moveItem = useCallback((fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= items.length) return;
+    const newItems = [...items];
+    const [moved] = newItems.splice(fromIndex, 1);
+    newItems.splice(toIndex, 0, moved);
+    setItems(newItems);
+    onReorder(newItems.map(item => item.investment.id));
+  }, [items, onReorder]);
 
   return (
     <>
@@ -115,12 +125,16 @@ export function DraggableInvestmentList({
           const isDragging = draggingId === id;
           const isDragOver = dragOverId === id && draggingId !== id;
           
+          const isFirst = items.indexOf(calc) === 0;
+          const isLast = items.indexOf(calc) === items.length - 1;
+          const currentIndex = items.indexOf(calc);
+
           return (
             <div
               key={id}
               data-investment-id={id}
               className={`
-                relative transition-all duration-200 ease-out cursor-grab
+                relative transition-all duration-200 ease-out
                 ${isDragging ? 'z-50 scale-105 shadow-2xl rotate-1' : ''}
                 ${isDragOver ? 'scale-95 opacity-60' : ''}
                 ${draggingId && !isDragging ? 'opacity-70' : ''}
@@ -150,10 +164,45 @@ export function DraggableInvestmentList({
               {isDragOver && (
                 <div className="absolute inset-x-0 -top-2 h-1 bg-primary rounded-full animate-pulse" />
               )}
+
+              {/* Reorder buttons */}
+              {!draggingId && items.length > 1 && (
+                <div className="absolute -left-1 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
+                  style={{ opacity: 1 }}
+                >
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-6 w-6 rounded-full shadow-md"
+                    disabled={isFirst}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      moveItem(currentIndex, currentIndex - 1);
+                    }}
+                  >
+                    <ChevronUp className="h-3 w-3" />
+                  </Button>
+                  <div className="flex items-center justify-center">
+                    <GripVertical className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-6 w-6 rounded-full shadow-md"
+                    disabled={isLast}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      moveItem(currentIndex, currentIndex + 1);
+                    }}
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
               
               <div 
                 onClick={() => handleCardClick(calc)}
-                className={isDragging ? 'pointer-events-none' : ''}
+                className={`${isDragging ? 'pointer-events-none' : ''} ${!draggingId && items.length > 1 ? 'ml-6' : ''}`}
               >
                 <InvestmentCard
                   calculation={calc}

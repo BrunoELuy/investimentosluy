@@ -26,7 +26,7 @@ interface PortfolioChartsProps {
 export function PortfolioCharts({ calculations }: PortfolioChartsProps) {
   const activeCalcs = calculations.filter(c => c.investment.is_active);
 
-  // Distribution by type (CDB vs LCA)
+  // Distribution by type (CDB, LCA, Ações)
   const typeDistribution = useMemo(() => {
     const cdbTotal = activeCalcs
       .filter(c => c.investment.type === 'CDB')
@@ -34,10 +34,14 @@ export function PortfolioCharts({ calculations }: PortfolioChartsProps) {
     const lcaTotal = activeCalcs
       .filter(c => c.investment.type === 'LCA')
       .reduce((sum, c) => sum + c.currentNetValue, 0);
+    const stockTotal = activeCalcs
+      .filter(c => c.investment.type === 'ACAO')
+      .reduce((sum, c) => sum + c.currentNetValue, 0);
 
     return [
       { name: 'CDB', value: cdbTotal, fill: 'hsl(var(--chart-1))' },
       { name: 'LCA', value: lcaTotal, fill: 'hsl(var(--chart-2))' },
+      { name: 'Ações', value: stockTotal, fill: 'hsl(280, 70%, 50%)' },
     ].filter(d => d.value > 0);
   }, [activeCalcs]);
 
@@ -110,6 +114,7 @@ export function PortfolioCharts({ calculations }: PortfolioChartsProps) {
   const chartConfigType = {
     CDB: { label: 'CDB', color: 'hsl(var(--chart-1))' },
     LCA: { label: 'LCA', color: 'hsl(var(--chart-2))' },
+    Ações: { label: 'Ações', color: 'hsl(280, 70%, 50%)' },
   };
 
   const chartConfigPerformance = {

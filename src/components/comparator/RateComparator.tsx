@@ -52,10 +52,7 @@ export function RateComparator() {
   
   const [initialValue, setInitialValue] = useState<number>(10000);
   const [periodMonths, setPeriodMonths] = useState<number>(12);
-  const [options, setOptions] = useState<InvestmentOption[]>([
-    { id: '1', name: 'CDB 110% CDI', type: 'CDB', rateType: 'CDI', rateValue: 110 },
-    { id: '2', name: 'LCA 95% CDI', type: 'LCA', rateType: 'CDI', rateValue: 95 },
-  ]);
+  const [options, setOptions] = useState<InvestmentOption[]>([]);
 
   const [newOption, setNewOption] = useState<Omit<InvestmentOption, 'id'>>({
     name: '',
