@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
+import { format, subMonths, endOfMonth, parseISO, differenceInDays, isBefore, isAfter } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { 
   PieChart, 
   Pie, 
@@ -17,13 +17,15 @@ import {
   ResponsiveContainer 
 } from 'recharts';
 import type { InvestmentCalculation } from '@/types/investment';
-import { formatCurrency, formatPercent } from '@/utils/investmentCalculations';
+import { formatCurrency, formatPercent, calculateGrossReturn } from '@/utils/investmentCalculations';
 
 interface PortfolioChartsProps {
   calculations: InvestmentCalculation[];
+  cdiRate?: number;
+  ipcaRate?: number;
 }
 
-export function PortfolioCharts({ calculations }: PortfolioChartsProps) {
+export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }: PortfolioChartsProps) {
   const activeCalcs = calculations.filter(c => c.investment.is_active);
 
   // Distribution by type (CDB, LCA, Ações)
@@ -83,33 +85,82 @@ export function PortfolioCharts({ calculations }: PortfolioChartsProps) {
       .slice(0, 10);
   }, [activeCalcs]);
 
-  // Monthly evolution simulation (last 6 months)
+  // Monthly evolution - recalculate each investment's value at each month end
   const monthlyEvolution = useMemo(() => {
     const data = [];
     const now = new Date();
 
-    for (let i = 5; i >= 0; i--) {
-      const monthDate = subMonths(now, i);
-      const monthLabel = format(monthDate, 'MMM/yy', { locale: ptBR });
+    for (let i = 11; i >= 0; i--) {
+      const monthEnd = endOfMonth(subMonths(now, i));
+      const monthLabel = format(monthEnd, 'MMM/yy', { locale: ptBR });
 
-      // Simulate growth based on elapsed days
-      const factor = (6 - i) / 6;
-      const grossValue = activeCalcs.reduce((sum, c) => {
-        return sum + c.totalInvested + (c.grossReturn * factor);
-      }, 0);
-      const netValue = activeCalcs.reduce((sum, c) => {
-        return sum + c.totalInvested + (c.netReturn * factor);
-      }, 0);
+      let totalGross = 0;
+      let totalNet = 0;
+      let totalInvested = 0;
+
+      for (const calc of activeCalcs) {
+        const inv = calc.investment;
+        const startDate = parseISO(inv.start_date);
+        const endDate = parseISO(inv.end_date);
+
+        // Skip if investment hadn't started yet
+        if (isAfter(startDate, monthEnd)) continue;
+
+        // Use the earlier of monthEnd or maturity date
+        const calcEnd = isBefore(monthEnd, endDate) ? monthEnd : endDate;
+        const days = Math.max(differenceInDays(calcEnd, startDate), 0);
+
+        // Initial value contribution
+        let investedAtMonth = inv.initial_value;
+        let grossReturn = 0;
+
+        if (inv.type === 'ACAO') {
+          // For stocks, just accumulate invested amounts
+          grossReturn = 0;
+        } else if (days > 0) {
+          grossReturn = calculateGrossReturn(
+            inv.initial_value, inv.rate_type, inv.rate_value,
+            days, cdiRate, ipcaRate, startDate, calcEnd
+          );
+        }
+
+        // Add deposits that existed by this month
+        for (const dep of calc.deposits) {
+          const depDate = parseISO(dep.deposit_date);
+          if (isAfter(depDate, monthEnd)) continue;
+
+          investedAtMonth += dep.amount;
+
+          if (inv.type !== 'ACAO') {
+            const depEnd = isBefore(monthEnd, endDate) ? monthEnd : endDate;
+            const depDays = Math.max(differenceInDays(depEnd, depDate), 0);
+            if (depDays > 0) {
+              grossReturn += calculateGrossReturn(
+                dep.amount, inv.rate_type, inv.rate_value,
+                depDays, cdiRate, ipcaRate, depDate, depEnd
+              );
+            }
+          }
+        }
+
+        totalInvested += investedAtMonth;
+        totalGross += investedAtMonth + grossReturn;
+        // Simplified net: apply same ratio as current calc
+        const netRatio = calc.totalInvested > 0 && calc.grossReturn > 0
+          ? calc.netReturn / calc.grossReturn
+          : 1;
+        totalNet += investedAtMonth + grossReturn * netRatio;
+      }
 
       data.push({
         month: monthLabel,
-        grossValue,
-        netValue,
+        grossValue: totalGross,
+        netValue: totalNet,
       });
     }
 
     return data;
-  }, [activeCalcs]);
+  }, [activeCalcs, cdiRate, ipcaRate]);
 
   const chartConfigType = {
     CDB: { label: 'CDB', color: 'hsl(var(--chart-1))' },
@@ -269,7 +320,7 @@ export function PortfolioCharts({ calculations }: PortfolioChartsProps) {
       {/* Monthly Evolution Area Chart */}
       <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle>Evolução da Carteira (Últimos 6 meses)</CardTitle>
+          <CardTitle>Evolução da Carteira (Últimos 12 meses)</CardTitle>
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfigEvolution} className="h-[300px] w-full">

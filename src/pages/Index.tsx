@@ -15,6 +15,7 @@ import { GoalsTab } from '@/components/goals/GoalsTab';
 import { OnlineStatusIndicator } from '@/components/OnlineStatusIndicator';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/hooks/useAuth';
+import { useEconomicRates } from '@/hooks/useEconomicRates';
 import { useInvestments, useCreateInvestment, useDeleteInvestment, useUpdateInvestment } from '@/hooks/useInvestments';
 import { useAllDeposits } from '@/hooks/useDeposits';
 import { calculateInvestment } from '@/utils/investmentCalculations';
@@ -23,6 +24,9 @@ import type { Investment, InvestmentCalculation, DashboardSummary as DashboardSu
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
+  const { data: rates } = useEconomicRates();
+  const cdiRate = rates?.cdi ?? 14.9;
+  const ipcaRate = rates?.ipca ?? 4.5;
   const { data: investments, isLoading: investmentsLoading } = useInvestments();
   const createInvestment = useCreateInvestment();
   const updateInvestment = useUpdateInvestment();
@@ -48,8 +52,8 @@ const Index = () => {
   // Calculate investments with deposits
   const baseCalculations: InvestmentCalculation[] = useMemo(() => 
     (investments || []).map(inv => 
-      calculateInvestment(inv, 10.65, 4.5, depositsByInvestment[inv.id] || [])
-    ), [investments, depositsByInvestment]
+      calculateInvestment(inv, cdiRate, ipcaRate, depositsByInvestment[inv.id] || [])
+    ), [investments, depositsByInvestment, cdiRate, ipcaRate]
   );
 
   // Sort calculations
@@ -276,7 +280,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="charts">
-            <PortfolioCharts calculations={calculations} />
+            <PortfolioCharts calculations={calculations} cdiRate={cdiRate} ipcaRate={ipcaRate} />
           </TabsContent>
 
           <TabsContent value="reports">
