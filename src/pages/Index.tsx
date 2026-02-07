@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Calculator, BarChart3, LogOut, TrendingUp, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { DashboardSummary } from '@/components/dashboard/DashboardSummary';
 import { InvestmentForm } from '@/components/investments/InvestmentForm';
 import { InvestmentDetails } from '@/components/investments/InvestmentDetails';
 import { DraggableInvestmentList } from '@/components/investments/DraggableInvestmentList';
+import { InvestmentSortMenu, type SortOption } from '@/components/investments/InvestmentSortMenu';
 import { PortfolioCharts } from '@/components/charts/PortfolioCharts';
 import { ReportExporter } from '@/components/reports/ReportExporter';
 import { GoalsTab } from '@/components/goals/GoalsTab';
@@ -34,7 +35,7 @@ const Index = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
-  const [investmentOrder, setInvestmentOrder] = useState<string[]>([]);
+  const [sortOption, setSortOption] = useState<SortOption>('default');
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -43,18 +44,6 @@ const Index = () => {
     }
   }, [authLoading, user, navigate]);
 
-  // Load saved order on mount
-  useEffect(() => {
-    const savedOrder = localStorage.getItem('investmentOrder');
-    if (savedOrder) {
-      try {
-        setInvestmentOrder(JSON.parse(savedOrder));
-      } catch {
-        // Invalid JSON, ignore
-      }
-    }
-  }, []);
-
   // Calculate investments with deposits
   const baseCalculations: InvestmentCalculation[] = useMemo(() => 
     (investments || []).map(inv => 
@@ -62,18 +51,28 @@ const Index = () => {
     ), [investments, depositsByInvestment]
   );
 
-  // Sort calculations by custom order if available
+  // Sort calculations
   const calculations = useMemo(() => {
-    if (investmentOrder.length === 0) return baseCalculations;
+    if (sortOption === 'default') return baseCalculations;
     return [...baseCalculations].sort((a, b) => {
-      const indexA = investmentOrder.indexOf(a.investment.id);
-      const indexB = investmentOrder.indexOf(b.investment.id);
-      if (indexA === -1 && indexB === -1) return 0;
-      if (indexA === -1) return 1;
-      if (indexB === -1) return -1;
-      return indexA - indexB;
+      switch (sortOption) {
+        case 'type': {
+          const order = { CDB: 0, LCA: 1, ACAO: 2 };
+          return (order[a.investment.type as keyof typeof order] ?? 3) - (order[b.investment.type as keyof typeof order] ?? 3);
+        }
+        case 'institution':
+          return a.investment.institution.localeCompare(b.investment.institution);
+        case 'value-desc':
+          return b.totalInvested - a.totalInvested;
+        case 'maturity-asc':
+          return new Date(a.investment.end_date).getTime() - new Date(b.investment.end_date).getTime();
+        case 'maturity-desc':
+          return new Date(b.investment.end_date).getTime() - new Date(a.investment.end_date).getTime();
+        default:
+          return 0;
+      }
     });
-  }, [baseCalculations, investmentOrder]);
+  }, [baseCalculations, sortOption]);
 
   // Compute dashboard summary
   const summary: DashboardSummaryType = useMemo(() => {
@@ -115,11 +114,6 @@ const Index = () => {
   const handleInvestmentClick = useCallback((calc: InvestmentCalculation) => {
     setSelectedCalculation(calc);
     setIsDetailsOpen(true);
-  }, []);
-
-  const handleReorder = useCallback((reorderedIds: string[]) => {
-    setInvestmentOrder(reorderedIds);
-    localStorage.setItem('investmentOrder', JSON.stringify(reorderedIds));
   }, []);
 
   const handleLogout = useCallback(async () => {
@@ -263,11 +257,15 @@ const Index = () => {
                 </Button>
               </div>
             ) : (
-              <DraggableInvestmentList
-                calculations={calculations}
-                onReorder={handleReorder}
-                onInvestmentClick={handleInvestmentClick}
-              />
+              <>
+                <div className="flex justify-end">
+                  <InvestmentSortMenu currentSort={sortOption} onSortChange={setSortOption} />
+                </div>
+                <DraggableInvestmentList
+                  calculations={calculations}
+                  onInvestmentClick={handleInvestmentClick}
+                />
+              </>
             )}
           </TabsContent>
 
