@@ -13,6 +13,7 @@ import { PortfolioCharts } from '@/components/charts/PortfolioCharts';
 import { ReportExporter } from '@/components/reports/ReportExporter';
 import { GoalsTab } from '@/components/goals/GoalsTab';
 import { OnlineStatusIndicator } from '@/components/OnlineStatusIndicator';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/hooks/useAuth';
 import { useInvestments, useCreateInvestment, useDeleteInvestment, useUpdateInvestment } from '@/hooks/useInvestments';
 import { useAllDeposits } from '@/hooks/useDeposits';
@@ -191,6 +192,7 @@ const Index = () => {
             <Button variant="outline" size="icon" onClick={() => navigate('/comparator')} className="sm:hidden">
               <BarChart3 className="h-4 w-4" />
             </Button>
+            <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={handleLogout}>
               <LogOut className="h-4 w-4" />
             </Button>
