@@ -18,6 +18,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useEconomicRates } from '@/hooks/useEconomicRates';
 import { useInvestments, useCreateInvestment, useDeleteInvestment, useUpdateInvestment } from '@/hooks/useInvestments';
 import { useAllDeposits } from '@/hooks/useDeposits';
+import { useStockQuotes } from '@/hooks/useStockQuotes';
 import { calculateInvestment } from '@/utils/investmentCalculations';
 import type { Investment, InvestmentCalculation, DashboardSummary as DashboardSummaryType, InvestmentFormData } from '@/types/investment';
 
@@ -36,6 +37,13 @@ const Index = () => {
   const investmentIds = useMemo(() => (investments || []).map(inv => inv.id), [investments]);
   const { data: depositsByInvestment = {} } = useAllDeposits(investmentIds);
   
+  // Extract tickers for stock quotes
+  const stockTickers = useMemo(() => 
+    (investments || [])
+      .filter(inv => inv.type === 'ACAO' && inv.ticker)
+      .map(inv => inv.ticker!)
+  , [investments]);
+  const { quotes: stockQuotes } = useStockQuotes(stockTickers);
   const [selectedCalculation, setSelectedCalculation] = useState<InvestmentCalculation | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -270,6 +278,7 @@ const Index = () => {
                 <DraggableInvestmentList
                   calculations={calculations}
                   onInvestmentClick={handleInvestmentClick}
+                  stockQuotes={stockQuotes}
                 />
               </>
             )}

@@ -5,11 +5,13 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import type { InvestmentCalculation } from '@/types/investment';
+import type { StockQuote } from '@/hooks/useStockQuotes';
 import { formatCurrency, formatPercent, formatRateValue } from '@/utils/investmentCalculations';
 
 interface InvestmentCardProps {
   calculation: InvestmentCalculation;
   onClick?: () => void;
+  stockQuote?: StockQuote;
 }
 
 // Color mapping for investment types
@@ -25,7 +27,7 @@ const TYPE_BADGE_VARIANTS = {
   ACAO: 'outline',
 } as const;
 
-export function InvestmentCard({ calculation, onClick }: InvestmentCardProps) {
+export function InvestmentCard({ calculation, onClick, stockQuote }: InvestmentCardProps) {
   const { investment, grossReturn, netReturn, netReturnPercent, currentNetValue, daysElapsed, totalDays, daysUntilMaturity, isMatured, irRate } = calculation;
 
   const isStock = investment.type === 'ACAO';
@@ -98,19 +100,48 @@ export function InvestmentCard({ calculation, onClick }: InvestmentCardProps) {
         </div>
 
         {isStock ? (
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-muted-foreground">Preço Médio</p>
-              <p className="font-semibold text-[hsl(280,70%,50%)]">
-                {averagePrice ? formatCurrency(averagePrice) : '-'}
-              </p>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Preço Médio</p>
+                <p className="font-semibold text-[hsl(280,70%,50%)]">
+                  {averagePrice ? formatCurrency(averagePrice) : '-'}
+                </p>
+              </div>
+              {stockQuote ? (
+                <div>
+                  <p className="text-xs text-muted-foreground">Cotação Atual</p>
+                  <p className="font-semibold">{formatCurrency(stockQuote.price)}</p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-xs text-muted-foreground">Data da Compra</p>
+                  <p className="font-medium text-sm">
+                    {format(new Date(investment.start_date), 'dd/MM/yyyy', { locale: ptBR })}
+                  </p>
+                </div>
+              )}
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Data da Compra</p>
-              <p className="font-medium text-sm">
-                {format(new Date(investment.start_date), 'dd/MM/yyyy', { locale: ptBR })}
-              </p>
-            </div>
+            {stockQuote && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {stockQuote.changePercent >= 0 ? (
+                    <TrendingUp className="h-4 w-4 text-success" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-destructive" />
+                  )}
+                  <span className={`text-sm font-semibold ${stockQuote.changePercent >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {stockQuote.changePercent >= 0 ? '+' : ''}{stockQuote.changePercent.toFixed(2)}% hoje
+                  </span>
+                </div>
+                {investment.quantity && averagePrice ? (
+                  <span className={`text-sm font-semibold ${stockQuote.price >= averagePrice ? 'text-success' : 'text-destructive'}`}>
+                    {stockQuote.price >= averagePrice ? '+' : ''}
+                    {formatCurrency((stockQuote.price - averagePrice) * investment.quantity)}
+                  </span>
+                ) : null}
+              </div>
+            )}
           </div>
         ) : (
           <>
