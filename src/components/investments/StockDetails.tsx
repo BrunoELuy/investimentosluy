@@ -6,11 +6,13 @@ import {
   Edit, 
   Trash2, 
   TrendingUp,
+  TrendingDown,
   Calendar,
   Building2,
   Hash,
   DollarSign,
-  Coins
+  Coins,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +31,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import type { InvestmentCalculation } from '@/types/investment';
 import { formatCurrency } from '@/utils/investmentCalculations';
+import { useStockQuotes } from '@/hooks/useStockQuotes';
 
 interface StockDetailsProps {
   calculation: InvestmentCalculation;
@@ -40,6 +43,10 @@ interface StockDetailsProps {
 export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDetailsProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const { investment } = calculation;
+  
+  const tickers = investment.ticker ? [investment.ticker] : [];
+  const { quotes, isLoading: quotesLoading, lastUpdated, refetch } = useStockQuotes(tickers);
+  const quote = investment.ticker ? quotes[investment.ticker] : undefined;
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -53,6 +60,18 @@ export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDet
   const averagePrice = investment.quantity 
     ? investment.initial_value / investment.quantity 
     : 0;
+
+  const currentMarketValue = quote && investment.quantity 
+    ? quote.price * investment.quantity 
+    : null;
+  
+  const totalGainLoss = currentMarketValue !== null 
+    ? currentMarketValue - investment.initial_value 
+    : null;
+  
+  const totalGainLossPercent = totalGainLoss !== null && investment.initial_value > 0
+    ? (totalGainLoss / investment.initial_value) * 100
+    : null;
 
   return (
     <div className="space-y-6">
@@ -128,7 +147,99 @@ export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDet
         </CardContent>
       </Card>
 
-      {/* Stats Grid - Stock specific */}
+      {/* Real-time Quote Card */}
+      {investment.ticker && (
+        <Card className="border-[hsl(280,70%,50%)]/30 bg-gradient-to-r from-[hsl(280,70%,50%)]/10 to-transparent">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                📈 Cotação em Tempo Real
+              </CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={refetch} 
+                disabled={quotesLoading}
+                className="gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${quotesLoading ? 'animate-spin' : ''}`} />
+                Atualizar
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {quote ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Preço Atual</p>
+                    <p className="text-2xl font-bold">{formatCurrency(quote.price)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Variação do Dia</p>
+                    <div className="flex items-center gap-1">
+                      {quote.changePercent >= 0 ? (
+                        <TrendingUp className="h-4 w-4 text-success" />
+                      ) : (
+                        <TrendingDown className="h-4 w-4 text-destructive" />
+                      )}
+                      <p className={`text-2xl font-bold ${quote.changePercent >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        {quote.changePercent >= 0 ? '+' : ''}{quote.changePercent.toFixed(2)}%
+                      </p>
+                    </div>
+                    <p className={`text-xs ${quote.change >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {quote.change >= 0 ? '+' : ''}{formatCurrency(quote.change)}
+                    </p>
+                  </div>
+                  {currentMarketValue !== null && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Valor de Mercado</p>
+                      <p className="text-2xl font-bold text-[hsl(280,70%,50%)]">
+                        {formatCurrency(currentMarketValue)}
+                      </p>
+                    </div>
+                  )}
+                  {totalGainLoss !== null && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Ganho/Perda Total</p>
+                      <div className="flex items-center gap-1">
+                        {totalGainLoss >= 0 ? (
+                          <TrendingUp className="h-4 w-4 text-success" />
+                        ) : (
+                          <TrendingDown className="h-4 w-4 text-destructive" />
+                        )}
+                        <p className={`text-2xl font-bold ${totalGainLoss >= 0 ? 'text-success' : 'text-destructive'}`}>
+                          {totalGainLoss >= 0 ? '+' : ''}{formatCurrency(totalGainLoss)}
+                        </p>
+                      </div>
+                      {totalGainLossPercent !== null && (
+                        <p className={`text-xs ${totalGainLoss >= 0 ? 'text-success' : 'text-destructive'}`}>
+                          {totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {lastUpdated && (
+                  <p className="text-xs text-muted-foreground text-right">
+                    Atualizado às {format(lastUpdated, 'HH:mm:ss', { locale: ptBR })} • Auto-refresh a cada 3 min
+                  </p>
+                )}
+              </div>
+            ) : quotesLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Carregando cotação...</span>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Não foi possível carregar a cotação. Tente atualizar.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card className="border-[hsl(280,70%,50%)]/20 bg-[hsl(280,70%,50%)]/5">
           <CardContent className="pt-6">
