@@ -129,14 +129,17 @@ export function useCreateInvestment() {
         throw new Error('Usuário não autenticado');
       }
 
+      const { deposits: _deposits, ...investmentFields } = formData;
+
       const investmentData = {
-        ...formData,
+        ...investmentFields,
         user_id: user.id,
         id: crypto.randomUUID(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         is_active: true,
       };
+
 
       if (isOnline()) {
         const { data, error } = await supabase
