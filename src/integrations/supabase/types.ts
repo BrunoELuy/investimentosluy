@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      b3_imports: {
+        Row: {
+          created_at: string
+          file_name: string | null
+          id: string
+          imported_at: string
+          mismatch_count: number
+          report_type: string
+          row_count: number
+          summary: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          imported_at?: string
+          mismatch_count?: number
+          report_type: string
+          row_count?: number
+          summary?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          imported_at?: string
+          mismatch_count?: number
+          report_type?: string
+          row_count?: number
+          summary?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       economic_rates: {
         Row: {
           created_at: string
@@ -155,12 +191,14 @@ export type Database = {
       }
       investments: {
         Row: {
+          b3_source: string | null
           created_at: string
           end_date: string
           id: string
           initial_value: number
           institution: string
           is_active: boolean
+          last_verified_at: string | null
           name: string
           notes: string | null
           quantity: number | null
@@ -171,14 +209,17 @@ export type Database = {
           type: string
           updated_at: string
           user_id: string
+          verified_value: number | null
         }
         Insert: {
+          b3_source?: string | null
           created_at?: string
           end_date: string
           id?: string
           initial_value: number
           institution: string
           is_active?: boolean
+          last_verified_at?: string | null
           name: string
           notes?: string | null
           quantity?: number | null
@@ -189,14 +230,17 @@ export type Database = {
           type: string
           updated_at?: string
           user_id: string
+          verified_value?: number | null
         }
         Update: {
+          b3_source?: string | null
           created_at?: string
           end_date?: string
           id?: string
           initial_value?: number
           institution?: string
           is_active?: boolean
+          last_verified_at?: string | null
           name?: string
           notes?: string | null
           quantity?: number | null
@@ -207,6 +251,7 @@ export type Database = {
           type?: string
           updated_at?: string
           user_id?: string
+          verified_value?: number | null
         }
         Relationships: []
       }
