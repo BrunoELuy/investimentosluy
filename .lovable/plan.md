@@ -6,6 +6,11 @@ Permitir que você suba o arquivo de **Posição** ou **Negociação** exportado
 
 Open Finance Brasil exige autorização do Banco Central e certificação — não há acesso gratuito para apps individuais. O extrato da B3 é a fonte oficial das suas posições em renda variável e renda fixa custodiada, é gratuito e não exige credenciais.
 
+## Passo 0 — corrigir erro de build existente
+
+`src/hooks/useInvestments.ts` envia o campo `deposits` (que só existe no formulário, não na tabela) direto para o banco nas operações de criar e atualizar, quebrando a checagem de tipos. Será removido do objeto antes do envio, nas duas mutações.
+
+
 ## O que será construído
 
 ### 1. Nova tela "Importar B3"
