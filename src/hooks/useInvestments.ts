@@ -190,10 +190,11 @@ export function useUpdateInvestment() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ id, ...formData }: InvestmentFormData & { id: string }) => {
+    mutationFn: async ({ id, deposits: _deposits, ...formData }: InvestmentFormData & { id: string }) => {
       const { data, error } = await supabase
         .from('investments')
         .update(formData)
+
         .eq('id', id)
         .select()
         .single();
