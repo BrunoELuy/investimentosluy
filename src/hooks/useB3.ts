@@ -128,7 +128,14 @@ export function useApplyB3Row() {
       const investment = row.investment;
       if (!investment) throw new Error('Investimento não encontrado');
 
-      const update: Partial<Investment> & Record<string, unknown> = {
+      const update: {
+        last_verified_at: string;
+        verified_value: number | null;
+        b3_source: string | null;
+        updated_at: string;
+        quantity?: number;
+        initial_value?: number;
+      } = {
         last_verified_at: new Date().toISOString(),
         verified_value: row.b3Value ?? null,
         b3_source: row.position?.reportType ?? null,

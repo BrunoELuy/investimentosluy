@@ -20,6 +20,10 @@ export interface Investment {
   // Stock-specific fields
   ticker?: string | null;
   quantity?: number | null;
+  // B3 reconciliation fields
+  last_verified_at?: string | null;
+  verified_value?: number | null;
+  b3_source?: string | null;
 }
 
 export interface InvestmentDeposit {
@@ -107,6 +111,7 @@ export interface DashboardSummary {
   stockCount: number;
   activeCount: number;
   maturedCount: number;
+  verifiedCount: number;
 }
 
 // Filter options
