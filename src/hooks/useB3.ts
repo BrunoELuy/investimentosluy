@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import type { B3Position, B3ReportType, ReconcileRow } from '@/types/b3';
-import type { Investment, InvestmentType, RateType } from '@/types/investment';
+import type { InvestmentType, RateType } from '@/types/investment';
 
 export interface B3Import {
   id: string;

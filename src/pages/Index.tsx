@@ -101,6 +101,7 @@ const Index = () => {
         stockCount: acc.stockCount + (calc.investment.type === 'ACAO' ? 1 : 0),
         activeCount: acc.activeCount + (!calc.isMatured ? 1 : 0),
         maturedCount: acc.maturedCount + (calc.isMatured ? 1 : 0),
+        verifiedCount: acc.verifiedCount + (calc.investment.last_verified_at ? 1 : 0),
       }),
       {
         totalInvested: 0,
@@ -113,6 +114,7 @@ const Index = () => {
         stockCount: 0,
         activeCount: 0,
         maturedCount: 0,
+        verifiedCount: 0,
       }
     );
 
