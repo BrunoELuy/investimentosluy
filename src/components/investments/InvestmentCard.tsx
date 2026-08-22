@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { TrendingUp, TrendingDown, Calendar, Building2, ArrowRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Calendar, Building2, ArrowRight, ShieldCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -68,6 +68,12 @@ export function InvestmentCard({ calculation, onClick, stockQuote }: InvestmentC
               {!isStock && !isMatured && daysUntilMaturity <= 30 && (
                 <Badge variant="outline" className="text-destructive border-destructive">
                   Vence em {daysUntilMaturity} dias
+                </Badge>
+              )}
+              {investment.last_verified_at && (
+                <Badge variant="outline" className="text-success border-success gap-1">
+                  <ShieldCheck className="h-3 w-3" />
+                  Conferido em {format(new Date(investment.last_verified_at), 'dd/MM', { locale: ptBR })}
                 </Badge>
               )}
             </div>

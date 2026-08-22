@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Calculator, BarChart3, LogOut, TrendingUp, Target } from 'lucide-react';
+import { Plus, Calculator, BarChart3, LogOut, TrendingUp, Target, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -101,6 +101,7 @@ const Index = () => {
         stockCount: acc.stockCount + (calc.investment.type === 'ACAO' ? 1 : 0),
         activeCount: acc.activeCount + (!calc.isMatured ? 1 : 0),
         maturedCount: acc.maturedCount + (calc.isMatured ? 1 : 0),
+        verifiedCount: acc.verifiedCount + (calc.investment.last_verified_at ? 1 : 0),
       }),
       {
         totalInvested: 0,
@@ -113,6 +114,7 @@ const Index = () => {
         stockCount: 0,
         activeCount: 0,
         maturedCount: 0,
+        verifiedCount: 0,
       }
     );
 
@@ -203,6 +205,13 @@ const Index = () => {
             </Button>
             <Button variant="outline" size="icon" onClick={() => navigate('/comparator')} className="sm:hidden">
               <BarChart3 className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/importar-b3')} className="hidden sm:flex">
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              B3
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => navigate('/importar-b3')} className="sm:hidden">
+              <FileSpreadsheet className="h-4 w-4" />
             </Button>
             <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={handleLogout}>

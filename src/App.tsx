@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import Simulator from "./pages/Simulator";
 import Comparator from "./pages/Comparator";
 import InvestmentDetail from "./pages/InvestmentDetail";
+import ImportB3 from "./pages/ImportB3";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/simulator" element={<Simulator />} />
           <Route path="/comparator" element={<Comparator />} />
           <Route path="/investment/:id" element={<InvestmentDetail />} />
+          <Route path="/importar-b3" element={<ImportB3 />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

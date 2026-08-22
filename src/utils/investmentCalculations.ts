@@ -267,6 +267,7 @@ export function calculateDashboardSummary(
     stockCount: calculations.filter(c => c.investment.type === 'ACAO').length,
     activeCount: activeCalcs.length,
     maturedCount: calculations.filter(c => c.isMatured).length,
+    verifiedCount: calculations.filter(c => !!c.investment.last_verified_at).length,
   };
 }
 
