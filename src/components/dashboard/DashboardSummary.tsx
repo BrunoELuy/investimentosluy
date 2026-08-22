@@ -94,6 +94,12 @@ export function DashboardSummary({ summary }: DashboardSummaryProps) {
                 <p className="text-xs text-muted-foreground truncate">{summary.maturedCount === 1 ? 'Vencido' : 'Vencidos'}</p>
               </div>
             )}
+            {summary.verifiedCount > 0 && (
+              <div className="min-w-0">
+                <p className="text-base sm:text-xl font-bold text-success">{summary.verifiedCount}</p>
+                <p className="text-xs text-muted-foreground truncate">Conferidos</p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
