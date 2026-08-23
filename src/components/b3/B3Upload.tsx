@@ -118,7 +118,34 @@ export function B3Upload({ onParsed }: B3UploadProps) {
             }}
           />
         </div>
+
+        {validation && (
+          <div className="mt-4 space-y-2">
+            {validation.valid && validation.errors.length === 0 && (
+              <Alert>
+                <CheckCircle2 className="h-4 w-4 text-success" />
+                <AlertTitle>Arquivo válido</AlertTitle>
+                <AlertDescription>As colunas obrigatórias foram encontradas.</AlertDescription>
+              </Alert>
+            )}
+            {validation.errors.map(message => (
+              <Alert key={message} variant="destructive">
+                <XCircle className="h-4 w-4" />
+                <AlertTitle>Não foi possível importar</AlertTitle>
+                <AlertDescription>{message}</AlertDescription>
+              </Alert>
+            ))}
+            {validation.warnings.map(message => (
+              <Alert key={message}>
+                <AlertTriangle className="h-4 w-4 text-warning" />
+                <AlertTitle>Atenção</AlertTitle>
+                <AlertDescription>{message}</AlertDescription>
+              </Alert>
+            ))}
+          </div>
+        )}
       </CardContent>
+
     </Card>
   );
 }
