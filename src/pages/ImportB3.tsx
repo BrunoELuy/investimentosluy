@@ -53,7 +53,9 @@ const ImportB3 = () => {
       </header>
 
       <main className="container py-4 sm:py-6 space-y-4 sm:space-y-6 px-4 overflow-x-hidden">
+        <B3FormatGuide />
         <B3Upload onParsed={handleParsed} />
+
         {parsed && (
           <p className="text-sm text-muted-foreground">
             Relatório detectado: <strong>{REPORT_TYPE_LABEL[parsed.reportType]}</strong> · aba {parsed.sheetName}
