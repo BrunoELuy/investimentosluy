@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { B3Upload } from '@/components/b3/B3Upload';
+import { B3FormatGuide } from '@/components/b3/B3FormatGuide';
+
 import { B3ReconcileTable } from '@/components/b3/B3ReconcileTable';
 import { B3ImportHistory } from '@/components/b3/B3ImportHistory';
 import { useAuth } from '@/hooks/useAuth';
@@ -53,7 +55,9 @@ const ImportB3 = () => {
       </header>
 
       <main className="container py-4 sm:py-6 space-y-4 sm:space-y-6 px-4 overflow-x-hidden">
+        <B3FormatGuide />
         <B3Upload onParsed={handleParsed} />
+
         {parsed && (
           <p className="text-sm text-muted-foreground">
             Relatório detectado: <strong>{REPORT_TYPE_LABEL[parsed.reportType]}</strong> · aba {parsed.sheetName}
