@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
-import { Upload, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { parseB3File, REPORT_TYPE_LABEL } from '@/lib/b3Parser';
+import { validateB3File, type B3Validation } from '@/lib/b3Validation';
 import type { B3ParseResult } from '@/types/b3';
 
 interface B3UploadProps {
@@ -16,26 +18,42 @@ export function B3Upload({ onParsed }: B3UploadProps) {
   const [loading, setLoading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [lastFile, setLastFile] = useState<string | null>(null);
+  const [validation, setValidation] = useState<B3Validation | null>(null);
 
   const handleFile = async (file: File) => {
     setLoading(true);
+    setValidation(null);
     try {
+      if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+        setValidation({ valid: false, errors: ['Extensão inválida. Envie um arquivo .xlsx, .xls ou .csv.'], warnings: [] });
+        return;
+      }
+
       const result = await parseB3File(file);
-      if (!result.positions.length) {
+      const check = validateB3File(result);
+      setValidation(check);
+      setLastFile(file.name);
+
+      if (!check.valid) {
         toast({
-          title: 'Nenhuma posição encontrada',
-          description: 'Verifique se o arquivo é o relatório exportado do portal da B3.',
+          title: 'Arquivo fora do padrão esperado',
+          description: check.errors[0],
           variant: 'destructive',
         });
         return;
       }
-      setLastFile(file.name);
+
       onParsed(result, file.name);
       toast({
-        title: 'Extrato lido com sucesso',
+        title: 'Extrato validado com sucesso',
         description: `${result.positions.length} posições · ${REPORT_TYPE_LABEL[result.reportType]}`,
       });
     } catch (error) {
+      setValidation({
+        valid: false,
+        errors: [error instanceof Error ? error.message : 'Formato não suportado.'],
+        warnings: [],
+      });
       toast({
         title: 'Erro ao ler o arquivo',
         description: error instanceof Error ? error.message : 'Formato não suportado.',
@@ -45,6 +63,7 @@ export function B3Upload({ onParsed }: B3UploadProps) {
       setLoading(false);
     }
   };
+
 
   return (
     <Card>
