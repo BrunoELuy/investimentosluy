@@ -70,9 +70,10 @@ Deno.serve(async (req) => {
 
 
     return new Response(
-      JSON.stringify({ quotes }),
+      JSON.stringify({ quotes, errors }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
   } catch (error) {
     console.error('Error fetching stock quotes:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
