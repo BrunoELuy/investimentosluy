@@ -23,18 +23,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Join tickers for batch request
-    const tickerList = tickers.join(',');
-    const url = `https://brapi.dev/api/quote/${tickerList}?token=${BRAPI_API_KEY}`;
-
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(`Brapi API error [${response.status}]: ${JSON.stringify(data)}`);
-    }
-
-    // Map results to a simplified format
     const quotes: Record<string, {
       price: number;
       change: number;
@@ -44,25 +32,48 @@ Deno.serve(async (req) => {
       shortName?: string;
       updatedAt: string;
     }> = {};
+    const errors: Record<string, string> = {};
 
-    if (data.results) {
-      for (const result of data.results) {
-        quotes[result.symbol] = {
-          price: result.regularMarketPrice ?? 0,
-          change: result.regularMarketChange ?? 0,
-          changePercent: result.regularMarketChangePercent ?? 0,
-          previousClose: result.regularMarketPreviousClose ?? 0,
-          marketCap: result.marketCap,
-          shortName: result.shortName,
-          updatedAt: new Date().toISOString(),
-        };
+    // Free Brapi plans allow only 1 ticker per request — fetch sequentially
+    const unique = [...new Set(tickers.map((t: string) => String(t).trim().toUpperCase()))].filter(Boolean);
+
+    for (const ticker of unique) {
+      const url = `https://brapi.dev/api/quote/${encodeURIComponent(ticker)}?token=${BRAPI_API_KEY}`;
+      const response = await fetch(url);
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.results?.length) {
+        const detail = typeof data?.message === 'string' ? data.message : `HTTP ${response.status}`;
+        console.error(`Brapi error for ${ticker}: ${detail}`);
+        errors[ticker] = detail;
+        continue;
       }
+
+      const result = data.results[0];
+      quotes[result.symbol ?? ticker] = {
+        price: result.regularMarketPrice ?? 0,
+        change: result.regularMarketChange ?? 0,
+        changePercent: result.regularMarketChangePercent ?? 0,
+        previousClose: result.regularMarketPreviousClose ?? 0,
+        marketCap: result.marketCap,
+        shortName: result.shortName,
+        updatedAt: new Date().toISOString(),
+      };
     }
 
+    if (!Object.keys(quotes).length && Object.keys(errors).length) {
+      return new Response(
+        JSON.stringify({ quotes, errors, error: Object.values(errors)[0] }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+
     return new Response(
-      JSON.stringify({ quotes }),
+      JSON.stringify({ quotes, errors }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
   } catch (error) {
     console.error('Error fetching stock quotes:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
