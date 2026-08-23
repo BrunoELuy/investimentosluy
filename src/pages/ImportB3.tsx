@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { B3Upload } from '@/components/b3/B3Upload';
+import { B3FormatGuide } from '@/components/b3/B3FormatGuide';
+
 import { B3ReconcileTable } from '@/components/b3/B3ReconcileTable';
 import { B3ImportHistory } from '@/components/b3/B3ImportHistory';
 import { useAuth } from '@/hooks/useAuth';
