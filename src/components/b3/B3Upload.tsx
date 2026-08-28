@@ -49,6 +49,8 @@ export function B3Upload({ onParsed }: B3UploadProps) {
         description: `${result.positions.length} posições · ${REPORT_TYPE_LABEL[result.reportType]}`,
       });
     } catch (error) {
+      console.error('Erro detalhado na importação:', error);
+      console.trace(); // opcional, mostra a pilha de chamadas
       setValidation({
         valid: false,
         errors: [error instanceof Error ? error.message : 'Formato não suportado.'],
@@ -90,9 +92,8 @@ export function B3Upload({ onParsed }: B3UploadProps) {
             const file = e.dataTransfer.files?.[0];
             if (file) handleFile(file);
           }}
-          className={`flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
-            dragging ? 'border-primary bg-primary/5' : 'border-muted'
-          }`}
+          className={`flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${dragging ? 'border-primary bg-primary/5' : 'border-muted'
+            }`}
         >
           {loading ? (
             <Loader2 className="h-8 w-8 animate-spin text-primary" />

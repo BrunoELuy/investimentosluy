@@ -28,7 +28,12 @@ const ImportB3 = () => {
   }, [authLoading, user, navigate]);
 
   const rows = useMemo(
-    () => (parsed && parsed.reportType !== 'MOVIMENTACAO' ? reconcile(parsed.positions, investments) : []),
+    () => {
+      if (!parsed || parsed.reportType === 'MOVIMENTACAO') return [];
+      // Garantir que positions seja um array
+      const positions = parsed.positions ?? [];
+      return reconcile(positions, investments);
+    },
     [parsed, investments]
   );
 
@@ -37,11 +42,12 @@ const ImportB3 = () => {
     setCurrentFileName(fileName);
 
     if (result.reportType !== 'MOVIMENTACAO') {
-      const mismatches = reconcile(result.positions, investments).filter(r => r.status !== 'OK').length;
+      const positions = result.positions ?? [];
+      const mismatches = reconcile(positions, investments).filter(r => r.status !== 'OK').length;
       registerImport.mutate({
         reportType: result.reportType,
         fileName,
-        rowCount: result.positions.length,
+        rowCount: positions.length,
         mismatchCount: mismatches,
         summary: { sheetName: result.sheetName, headers: result.headers },
       });
