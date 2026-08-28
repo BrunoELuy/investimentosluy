@@ -4,7 +4,8 @@ import { ArrowLeft, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { B3Upload } from '@/components/b3/B3Upload';
 import { B3FormatGuide } from '@/components/b3/B3FormatGuide';
-
+import { B3MovementsPreview } from '@/components/b3/B3MovementsPreview';
+import { B3DividendsList } from '@/components/b3/B3DividendsList';
 import { B3ReconcileTable } from '@/components/b3/B3ReconcileTable';
 import { B3ImportHistory } from '@/components/b3/B3ImportHistory';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,26 +21,31 @@ const ImportB3 = () => {
   const { data: investments = [] } = useInvestments();
   const registerImport = useRegisterB3Import();
   const [parsed, setParsed] = useState<B3ParseResult | null>(null);
+  const [currentFileName, setCurrentFileName] = useState<string>('extrato_b3.xlsx');
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/auth');
   }, [authLoading, user, navigate]);
 
   const rows = useMemo(
-    () => (parsed ? reconcile(parsed.positions, investments) : []),
+    () => (parsed && parsed.reportType !== 'MOVIMENTACAO' ? reconcile(parsed.positions, investments) : []),
     [parsed, investments]
   );
 
   const handleParsed = (result: B3ParseResult, fileName: string) => {
     setParsed(result);
-    const mismatches = reconcile(result.positions, investments).filter(r => r.status !== 'OK').length;
-    registerImport.mutate({
-      reportType: result.reportType,
-      fileName,
-      rowCount: result.positions.length,
-      mismatchCount: mismatches,
-      summary: { sheetName: result.sheetName, headers: result.headers },
-    });
+    setCurrentFileName(fileName);
+
+    if (result.reportType !== 'MOVIMENTACAO') {
+      const mismatches = reconcile(result.positions, investments).filter(r => r.status !== 'OK').length;
+      registerImport.mutate({
+        reportType: result.reportType,
+        fileName,
+        rowCount: result.positions.length,
+        mismatchCount: mismatches,
+        summary: { sheetName: result.sheetName, headers: result.headers },
+      });
+    }
   };
 
   return (
@@ -50,20 +56,45 @@ const ImportB3 = () => {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <FileSpreadsheet className="h-5 w-5 text-primary flex-shrink-0" />
-          <h1 className="text-lg font-bold truncate">Importar extrato da B3</h1>
+          <h1 className="text-lg font-bold truncate">Importar Extrato da B3</h1>
         </div>
       </header>
 
-      <main className="container py-4 sm:py-6 space-y-4 sm:space-y-6 px-4 overflow-x-hidden">
+      <main className="container py-4 sm:py-6 space-y-6 px-4 overflow-x-hidden">
         <B3FormatGuide />
+
         <B3Upload onParsed={handleParsed} />
 
         {parsed && (
-          <p className="text-sm text-muted-foreground">
-            Relatório detectado: <strong>{REPORT_TYPE_LABEL[parsed.reportType]}</strong> · aba {parsed.sheetName}
-          </p>
+          <div className="flex items-center justify-between text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg border">
+            <span>
+              Relatório detectado: <strong>{REPORT_TYPE_LABEL[parsed.reportType]}</strong> · aba <em>{parsed.sheetName}</em>
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => setParsed(null)}>
+              Limpar prévia
+            </Button>
+          </div>
         )}
-        <B3ReconcileTable rows={rows} />
+
+        {/* New 8-column Movement report preview */}
+        {parsed?.reportType === 'MOVIMENTACAO' && parsed.consolidation && (
+          <B3MovementsPreview
+            consolidation={parsed.consolidation}
+            existingInvestments={investments}
+            fileName={currentFileName}
+            onImportComplete={() => setParsed(null)}
+          />
+        )}
+
+        {/* Legacy Position Reconciliation Table */}
+        {parsed && parsed.reportType !== 'MOVIMENTACAO' && (
+          <B3ReconcileTable rows={rows} />
+        )}
+
+        {/* Historical Dividends & Charts Section */}
+        <B3DividendsList />
+
+        {/* Import History */}
         <B3ImportHistory />
       </main>
     </div>
