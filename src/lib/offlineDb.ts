@@ -1,6 +1,7 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import type { Investment } from '@/types/investment';
 import type { InvestmentGoal } from '@/types/goal';
+import type { DividendPayment } from '@/types/b3';
 
 interface InvestDeposit {
   id: string;
@@ -15,7 +16,7 @@ interface InvestDeposit {
 
 interface SyncQueueItem {
   id: string;
-  table: 'investments' | 'investment_goals' | 'investment_deposits';
+  table: 'investments' | 'investment_goals' | 'investment_deposits' | 'dividend_payments';
   operation: 'create' | 'update' | 'delete';
   data: any;
   timestamp: number;
@@ -37,6 +38,11 @@ interface InvestTrackerDB extends DBSchema {
     value: InvestDeposit;
     indexes: { 'by-investment': string; 'by-user': string };
   };
+  dividend_payments: {
+    key: string;
+    value: DividendPayment;
+    indexes: { 'by-user': string; 'by-ticker': string };
+  };
   sync_queue: {
     key: string;
     value: SyncQueueItem;
@@ -49,13 +55,13 @@ interface InvestTrackerDB extends DBSchema {
 }
 
 const DB_NAME = 'investtracker-offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbInstance: IDBPDatabase<InvestTrackerDB> | null = null;
 
 export async function getDb(): Promise<IDBPDatabase<InvestTrackerDB>> {
   if (dbInstance) return dbInstance;
-  
+
   dbInstance = await openDB<InvestTrackerDB>(DB_NAME, DB_VERSION, {
     upgrade(db) {
       // Investments store
@@ -63,33 +69,40 @@ export async function getDb(): Promise<IDBPDatabase<InvestTrackerDB>> {
         const investmentsStore = db.createObjectStore('investments', { keyPath: 'id' });
         investmentsStore.createIndex('by-user', 'user_id');
       }
-      
+
       // Goals store
       if (!db.objectStoreNames.contains('investment_goals')) {
         const goalsStore = db.createObjectStore('investment_goals', { keyPath: 'id' });
         goalsStore.createIndex('by-user', 'user_id');
       }
-      
+
       // Deposits store
       if (!db.objectStoreNames.contains('investment_deposits')) {
         const depositsStore = db.createObjectStore('investment_deposits', { keyPath: 'id' });
         depositsStore.createIndex('by-investment', 'investment_id');
         depositsStore.createIndex('by-user', 'user_id');
       }
-      
+
+      // Dividend payments store
+      if (!db.objectStoreNames.contains('dividend_payments')) {
+        const dividendsStore = db.createObjectStore('dividend_payments', { keyPath: 'id' });
+        dividendsStore.createIndex('by-user', 'user_id');
+        dividendsStore.createIndex('by-ticker', 'ticker');
+      }
+
       // Sync queue for pending operations
       if (!db.objectStoreNames.contains('sync_queue')) {
         const syncStore = db.createObjectStore('sync_queue', { keyPath: 'id' });
         syncStore.createIndex('by-table', 'table');
       }
-      
+
       // Meta store for last sync timestamps
       if (!db.objectStoreNames.contains('meta')) {
         db.createObjectStore('meta', { keyPath: 'key' });
       }
     },
   });
-  
+
   return dbInstance;
 }
 
@@ -164,6 +177,32 @@ export async function saveLocalDeposits(deposits: InvestDeposit[]): Promise<void
   ]);
 }
 
+// ============ Dividend Payments ============
+export async function getLocalDividends(userId?: string): Promise<DividendPayment[]> {
+  const db = await getDb();
+  if (!userId) return db.getAll('dividend_payments');
+  return db.getAllFromIndex('dividend_payments', 'by-user', userId);
+}
+
+export async function getLocalDividendsByTicker(ticker: string): Promise<DividendPayment[]> {
+  const db = await getDb();
+  return db.getAllFromIndex('dividend_payments', 'by-ticker', ticker);
+}
+
+export async function saveLocalDividends(dividends: DividendPayment[]): Promise<void> {
+  const db = await getDb();
+  const tx = db.transaction('dividend_payments', 'readwrite');
+  await Promise.all([
+    ...dividends.map(d => tx.store.put(d)),
+    tx.done
+  ]);
+}
+
+export async function deleteLocalDividend(id: string): Promise<void> {
+  const db = await getDb();
+  await db.delete('dividend_payments', id);
+}
+
 // ============ Sync Queue ============
 export async function addToSyncQueue(item: Omit<SyncQueueItem, 'id' | 'timestamp'>): Promise<void> {
   const db = await getDb();
@@ -209,6 +248,7 @@ export async function clearAllLocalData(): Promise<void> {
     db.clear('investments'),
     db.clear('investment_goals'),
     db.clear('investment_deposits'),
+    db.clear('dividend_payments'),
     db.clear('sync_queue'),
     db.clear('meta'),
   ]);

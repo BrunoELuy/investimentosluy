@@ -2,8 +2,23 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import type { B3Position, B3ReportType, ReconcileRow } from '@/types/b3';
-import type { InvestmentType, RateType } from '@/types/investment';
+import type {
+  B3Position,
+  B3ReportType,
+  ReconcileRow,
+  DividendPayment,
+  B3AggregatedStock,
+  B3AggregatedFixedIncome,
+} from '@/types/b3';
+import type { Investment, InvestmentType, RateType } from '@/types/investment';
+import {
+  getLocalDividends,
+  saveLocalDividends,
+  saveLocalInvestment,
+  saveLocalInvestments,
+  saveLocalDeposits,
+  isOnline,
+} from '@/lib/offlineDb';
 
 export interface B3Import {
   id: string;
@@ -35,6 +50,19 @@ export function useB3Imports() {
   });
 }
 
+export function useDividendPayments() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['dividend-payments', user?.id],
+    queryFn: async (): Promise<DividendPayment[]> => {
+      const local = await getLocalDividends(user?.id);
+      return local.sort((a, b) => b.date.localeCompare(a.date));
+    },
+    enabled: !!user,
+  });
+}
+
 export function useRegisterB3Import() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -60,6 +88,244 @@ export function useRegisterB3Import() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['b3-imports'] });
+    },
+  });
+}
+
+/**
+ * Imports full B3 consolidated movements:
+ * - Active Stocks (non-zero): creates or updates positions.
+ * - Active Fixed Income (non-zero): creates or updates positions + deposits.
+ * - Zero balance positions: NOT created/added.
+ * - Dividends/JCP: 100% saved and persisted regardless of whether asset is zeroed.
+ */
+export function useImportB3Movements() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (params: {
+      stocks: B3AggregatedStock[];
+      fixedIncome: B3AggregatedFixedIncome[];
+      dividends: DividendPayment[];
+      existingInvestments: Investment[];
+      fileName: string;
+    }) => {
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { stocks, fixedIncome, dividends, existingInvestments, fileName } = params;
+      const now = new Date().toISOString();
+      const today = now.split('T')[0];
+
+      // 1. Process and save all dividends (including zero-balance assets)
+      const userDividends = dividends.map(d => ({
+        ...d,
+        user_id: user.id,
+        created_at: now,
+      }));
+      await saveLocalDividends(userDividends);
+
+      let createdCount = 0;
+      let updatedCount = 0;
+
+      // 2. Process non-zero Stocks
+      const activeStocks = stocks.filter(s => !s.isZeroBalance && s.totalQuantity > 0);
+      for (const stock of activeStocks) {
+        const existing = existingInvestments.find(
+          inv => inv.type === 'ACAO' && inv.ticker && inv.ticker.toUpperCase() === stock.ticker.toUpperCase()
+        );
+
+        if (existing) {
+          // Update existing stock
+          const updatePayload = {
+            quantity: stock.totalQuantity,
+            initial_value: stock.totalInvested,
+            last_verified_at: now,
+            verified_value: stock.totalQuantity,
+            b3_source: 'MOVIMENTACAO',
+            updated_at: now,
+          };
+
+          if (isOnline()) {
+            await supabase.from('investments').update(updatePayload).eq('id', existing.id);
+          }
+          await saveLocalInvestment({ ...existing, ...updatePayload });
+          updatedCount++;
+        } else {
+          // Create new stock
+          const newId = crypto.randomUUID();
+          const newStock = {
+            id: newId,
+            user_id: user.id,
+            type: 'ACAO' as InvestmentType,
+            name: stock.ticker,
+            ticker: stock.ticker,
+            institution: stock.institution || 'B3',
+            initial_value: stock.totalInvested,
+            quantity: stock.totalQuantity,
+            rate_type: 'NONE' as RateType,
+            rate_value: 0,
+            start_date: stock.firstDate || today,
+            end_date: stock.lastDate || stock.firstDate || today,
+            is_active: true,
+            notes: `Importado da B3 (${stock.operationsCount} operações)`,
+            last_verified_at: now,
+            verified_value: stock.totalQuantity,
+            b3_source: 'MOVIMENTACAO',
+            created_at: now,
+            updated_at: now,
+          };
+
+          if (isOnline()) {
+            await supabase.from('investments').insert(newStock);
+          }
+          await saveLocalInvestment(newStock);
+          createdCount++;
+        }
+      }
+
+      // 3. Process non-zero Fixed Income (CDB / LCA)
+      const activeFixedIncome = fixedIncome.filter(fi => !fi.isZeroBalance && fi.netInvested > 0);
+      for (const fi of activeFixedIncome) {
+        const existing = fi.existingInvestmentId
+          ? existingInvestments.find(inv => inv.id === fi.existingInvestmentId)
+          : existingInvestments.find(
+            inv =>
+              inv.type === fi.type &&
+              inv.institution.toLowerCase().includes(fi.institution.toLowerCase()) &&
+              inv.rate_type === fi.rateType &&
+              inv.rate_value === fi.rateValue
+          );
+
+        if (existing) {
+          // Update existing fixed income
+          const updatePayload = {
+            initial_value: fi.netInvested,
+            last_verified_at: now,
+            verified_value: fi.netInvested,
+            b3_source: 'MOVIMENTACAO',
+            updated_at: now,
+          };
+
+          if (isOnline()) {
+            await supabase.from('investments').update(updatePayload).eq('id', existing.id);
+          }
+          await saveLocalInvestment({ ...existing, ...updatePayload });
+
+          // Insert new deposits if present
+          if (fi.deposits.length > 0) {
+            const newDeposits = fi.deposits.map(d => ({
+              id: crypto.randomUUID(),
+              investment_id: existing.id,
+              user_id: user.id,
+              amount: d.amount,
+              deposit_date: d.deposit_date,
+              notes: d.notes || 'Aporte B3',
+              created_at: now,
+              updated_at: now,
+            }));
+
+            if (isOnline()) {
+              await supabase.from('investment_deposits').insert(newDeposits);
+            }
+            await saveLocalDeposits(newDeposits);
+          }
+          updatedCount++;
+        } else {
+          // Create new fixed income investment
+          const newId = crypto.randomUUID();
+          // The base initial value is either the net invested minus additional deposits or net invested
+          const baseInitial = fi.deposits.length > 0
+            ? Math.max(0, fi.netInvested - fi.deposits.reduce((sum, d) => sum + d.amount, 0)) || fi.netInvested
+            : fi.netInvested;
+
+          const newInvestment = {
+            id: newId,
+            user_id: user.id,
+            type: fi.type as InvestmentType,
+            name: fi.name,
+            institution: fi.institution,
+            initial_value: baseInitial,
+            rate_type: fi.rateType,
+            rate_value: fi.rateValue,
+            start_date: fi.startDate || today,
+            end_date: fi.endDate || today,
+            is_active: true,
+            notes: `Importado da B3 (${fi.operationsCount} operações)`,
+            last_verified_at: now,
+            verified_value: fi.netInvested,
+            b3_source: 'MOVIMENTACAO',
+            created_at: now,
+            updated_at: now,
+          };
+
+          if (isOnline()) {
+            await supabase.from('investments').insert(newInvestment);
+          }
+          await saveLocalInvestment(newInvestment);
+
+          // Save deposits if any
+          if (fi.deposits.length > 0) {
+            const newDeposits = fi.deposits.map(d => ({
+              id: crypto.randomUUID(),
+              investment_id: newId,
+              user_id: user.id,
+              amount: d.amount,
+              deposit_date: d.deposit_date,
+              notes: d.notes || 'Aporte B3',
+              created_at: now,
+              updated_at: now,
+            }));
+
+            if (isOnline()) {
+              await supabase.from('investment_deposits').insert(newDeposits);
+            }
+            await saveLocalDeposits(newDeposits);
+          }
+          createdCount++;
+        }
+      }
+
+      // 4. Register B3 import log
+      if (isOnline()) {
+        try {
+          await supabase.from('b3_imports').insert({
+            user_id: user.id,
+            report_type: 'MOVIMENTACAO',
+            file_name: fileName,
+            row_count: stocks.length + fixedIncome.length + dividends.length,
+            mismatch_count: 0,
+            summary: {
+              createdCount,
+              updatedCount,
+              dividendsCount: dividends.length,
+              totalDividends: dividends.reduce((s, d) => s + d.totalAmount, 0),
+            } as never,
+          });
+        } catch {
+          // Continue if import log fails
+        }
+      }
+
+      return { createdCount, updatedCount, dividendsCount: dividends.length };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['investments'] });
+      queryClient.invalidateQueries({ queryKey: ['all-deposits'] });
+      queryClient.invalidateQueries({ queryKey: ['dividend-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['b3-imports'] });
+      toast({
+        title: 'Importação concluída com sucesso!',
+        description: `${data.createdCount} novos investimentos, ${data.updatedCount} atualizados, ${data.dividendsCount} proventos registrados.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro na importação',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 }
