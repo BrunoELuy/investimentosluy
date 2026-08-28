@@ -3,18 +3,18 @@ import { format, subMonths, endOfMonth, parseISO, differenceInDays, isBefore, is
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { 
-  PieChart, 
-  Pie, 
-  Cell, 
-  AreaChart, 
-  Area, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
+import {
+  PieChart,
+  Pie,
+  Cell,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
   CartesianGrid,
-  ResponsiveContainer 
+  ResponsiveContainer
 } from 'recharts';
 import type { InvestmentCalculation } from '@/types/investment';
 import { formatCurrency, formatPercent, calculateGrossReturn } from '@/utils/investmentCalculations';
@@ -212,12 +212,12 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
                   <Cell key={`cell-${index}`} fill={entry.fill} />
                 ))}
               </Pie>
-              <ChartTooltip 
+              <ChartTooltip
                 content={
-                  <ChartTooltipContent 
+                  <ChartTooltipContent
                     formatter={(value) => formatCurrency(value as number)}
                   />
-                } 
+                }
               />
             </PieChart>
           </ChartContainer>
@@ -254,12 +254,12 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
                   <Cell key={`cell-${index}`} fill={entry.fill} />
                 ))}
               </Pie>
-              <ChartTooltip 
+              <ChartTooltip
                 content={
-                  <ChartTooltipContent 
+                  <ChartTooltipContent
                     formatter={(value) => formatCurrency(value as number)}
                   />
-                } 
+                }
               />
             </PieChart>
           </ChartContainer>
@@ -284,21 +284,21 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
             <BarChart data={performanceData} layout="vertical" margin={{ left: 20, right: 20 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={true} vertical={false} />
               <XAxis type="number" tickFormatter={(v) => `${v.toFixed(1)}%`} />
-              <YAxis 
-                type="category" 
-                dataKey="name" 
+              <YAxis
+                type="category"
+                dataKey="name"
                 width={150}
                 tick={{ fontSize: 12 }}
               />
-              <ChartTooltip 
+              <ChartTooltip
                 content={
-                  <ChartTooltipContent 
+                  <ChartTooltipContent
                     formatter={(value, name) => {
                       const label = name === 'grossPercent' ? 'Bruto' : 'Líquido';
                       return [`${(value as number).toFixed(2)}%`, label];
                     }}
                   />
-                } 
+                }
               />
               <Bar dataKey="grossPercent" fill="hsl(var(--chart-1))" radius={[0, 4, 4, 0]} />
               <Bar dataKey="netPercent" fill="hsl(var(--chart-2))" radius={[0, 4, 4, 0]} />
@@ -338,15 +338,15 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
               <YAxis tickFormatter={(v) => formatCurrency(v)} width={100} tick={{ fontSize: 12 }} />
-              <ChartTooltip 
+              <ChartTooltip
                 content={
-                  <ChartTooltipContent 
+                  <ChartTooltipContent
                     formatter={(value, name) => {
                       const label = name === 'grossValue' ? 'Bruto' : 'Líquido';
                       return [formatCurrency(value as number), label];
                     }}
                   />
-                } 
+                }
               />
               <Area
                 type="monotone"
