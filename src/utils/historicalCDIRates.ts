@@ -1,220 +1,179 @@
+export interface CDIPeriod {
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+  annualRate: number; // taxa anual em %
+}
+
 /**
- * Historical CDI rates by year (accumulated annual %)
- * Source: B3 / Investidor10 - Official CDI historical data
- * 
- * These rates represent the accumulated CDI for each year,
- * used for accurate calculation of investments that started in the past.
+ * Tabela oficial de decisões COPOM / CDI desde 2010.
+ * Cada período define a taxa anual vigente entre as datas.
  */
-
-export interface YearlyCDIRate {
-  year: number;
-  annualRate: number; // Accumulated CDI for the year in %
-}
-
-// Historical CDI rates from 2015 onwards
-export const HISTORICAL_CDI_RATES: YearlyCDIRate[] = [
-  { year: 2015, annualRate: 13.27 },
-  { year: 2016, annualRate: 14.02 },
-  { year: 2017, annualRate: 9.94 },
-  { year: 2018, annualRate: 6.43 },
-  { year: 2019, annualRate: 5.96 },
-  { year: 2020, annualRate: 2.76 },
-  { year: 2021, annualRate: 4.42 },
-  { year: 2022, annualRate: 12.39 },
-  { year: 2023, annualRate: 13.04 },
-  { year: 2024, annualRate: 10.88 },
-  { year: 2025, annualRate: 14.32 },
-];
-
-// Monthly CDI rates for 2020-2025 for more precise calculations
-export interface MonthlyCDIRate {
-  year: number;
-  month: number; // 1-12
-  rate: number; // Monthly rate in %
-}
-
-export const MONTHLY_CDI_RATES: MonthlyCDIRate[] = [
-  // 2020
-  { year: 2020, month: 1, rate: 0.38 },
-  { year: 2020, month: 2, rate: 0.29 },
-  { year: 2020, month: 3, rate: 0.34 },
-  { year: 2020, month: 4, rate: 0.28 },
-  { year: 2020, month: 5, rate: 0.24 },
-  { year: 2020, month: 6, rate: 0.21 },
-  { year: 2020, month: 7, rate: 0.19 },
-  { year: 2020, month: 8, rate: 0.16 },
-  { year: 2020, month: 9, rate: 0.16 },
-  { year: 2020, month: 10, rate: 0.16 },
-  { year: 2020, month: 11, rate: 0.15 },
-  { year: 2020, month: 12, rate: 0.16 },
-  // 2021
-  { year: 2021, month: 1, rate: 0.15 },
-  { year: 2021, month: 2, rate: 0.13 },
-  { year: 2021, month: 3, rate: 0.20 },
-  { year: 2021, month: 4, rate: 0.21 },
-  { year: 2021, month: 5, rate: 0.27 },
-  { year: 2021, month: 6, rate: 0.31 },
-  { year: 2021, month: 7, rate: 0.36 },
-  { year: 2021, month: 8, rate: 0.43 },
-  { year: 2021, month: 9, rate: 0.44 },
-  { year: 2021, month: 10, rate: 0.49 },
-  { year: 2021, month: 11, rate: 0.59 },
-  { year: 2021, month: 12, rate: 0.77 },
-  // 2022
-  { year: 2022, month: 1, rate: 0.73 },
-  { year: 2022, month: 2, rate: 0.76 },
-  { year: 2022, month: 3, rate: 0.93 },
-  { year: 2022, month: 4, rate: 0.83 },
-  { year: 2022, month: 5, rate: 1.03 },
-  { year: 2022, month: 6, rate: 1.02 },
-  { year: 2022, month: 7, rate: 1.03 },
-  { year: 2022, month: 8, rate: 1.17 },
-  { year: 2022, month: 9, rate: 1.07 },
-  { year: 2022, month: 10, rate: 1.02 },
-  { year: 2022, month: 11, rate: 1.02 },
-  { year: 2022, month: 12, rate: 1.12 },
-  // 2023
-  { year: 2023, month: 1, rate: 1.12 },
-  { year: 2023, month: 2, rate: 0.92 },
-  { year: 2023, month: 3, rate: 1.17 },
-  { year: 2023, month: 4, rate: 0.92 },
-  { year: 2023, month: 5, rate: 1.12 },
-  { year: 2023, month: 6, rate: 1.07 },
-  { year: 2023, month: 7, rate: 1.07 },
-  { year: 2023, month: 8, rate: 1.14 },
-  { year: 2023, month: 9, rate: 0.97 },
-  { year: 2023, month: 10, rate: 1.00 },
-  { year: 2023, month: 11, rate: 0.92 },
-  { year: 2023, month: 12, rate: 0.89 },
-  // 2024
-  { year: 2024, month: 1, rate: 0.97 },
-  { year: 2024, month: 2, rate: 0.80 },
-  { year: 2024, month: 3, rate: 0.83 },
-  { year: 2024, month: 4, rate: 0.89 },
-  { year: 2024, month: 5, rate: 0.83 },
-  { year: 2024, month: 6, rate: 0.79 },
-  { year: 2024, month: 7, rate: 0.91 },
-  { year: 2024, month: 8, rate: 0.87 },
-  { year: 2024, month: 9, rate: 0.84 },
-  { year: 2024, month: 10, rate: 0.93 },
-  { year: 2024, month: 11, rate: 0.79 },
-  { year: 2024, month: 12, rate: 0.93 },
-  // 2025
-  { year: 2025, month: 1, rate: 1.01 },
-  { year: 2025, month: 2, rate: 0.99 },
-  { year: 2025, month: 3, rate: 0.96 },
-  { year: 2025, month: 4, rate: 1.06 },
-  { year: 2025, month: 5, rate: 1.14 },
-  { year: 2025, month: 6, rate: 1.10 },
-  { year: 2025, month: 7, rate: 1.28 },
-  { year: 2025, month: 8, rate: 1.16 },
-  { year: 2025, month: 9, rate: 1.22 },
-  { year: 2025, month: 10, rate: 1.28 },
-  { year: 2025, month: 11, rate: 1.05 },
-  { year: 2025, month: 12, rate: 1.22 },
+export const HISTORICAL_CDI_PERIODS: CDIPeriod[] = [
+  { startDate: '2010-01-28', endDate: '2010-04-28', annualRate: 8.75 },
+  { startDate: '2010-04-29', endDate: '2010-06-09', annualRate: 9.50 },
+  { startDate: '2010-06-10', endDate: '2010-07-21', annualRate: 10.25 },
+  { startDate: '2010-07-22', endDate: '2011-01-18', annualRate: 10.75 },
+  { startDate: '2011-01-19', endDate: '2011-03-01', annualRate: 11.25 },
+  { startDate: '2011-03-02', endDate: '2011-04-19', annualRate: 11.75 },
+  { startDate: '2011-04-20', endDate: '2011-06-07', annualRate: 12.00 },
+  { startDate: '2011-06-08', endDate: '2011-07-19', annualRate: 12.25 },
+  { startDate: '2011-07-20', endDate: '2011-08-30', annualRate: 12.50 },
+  { startDate: '2011-08-31', endDate: '2011-10-18', annualRate: 12.00 },
+  { startDate: '2011-10-19', endDate: '2011-11-29', annualRate: 11.50 },
+  { startDate: '2011-11-30', endDate: '2012-01-17', annualRate: 11.00 },
+  { startDate: '2012-01-18', endDate: '2012-03-06', annualRate: 10.50 },
+  { startDate: '2012-03-07', endDate: '2012-04-17', annualRate: 9.75 },
+  { startDate: '2012-04-18', endDate: '2012-05-29', annualRate: 9.00 },
+  { startDate: '2012-05-30', endDate: '2012-07-10', annualRate: 8.50 },
+  { startDate: '2012-07-11', endDate: '2012-08-28', annualRate: 8.00 },
+  { startDate: '2012-08-29', endDate: '2012-10-09', annualRate: 7.50 },
+  { startDate: '2012-10-10', endDate: '2013-04-16', annualRate: 7.25 },
+  { startDate: '2013-04-17', endDate: '2013-05-28', annualRate: 7.50 },
+  { startDate: '2013-05-29', endDate: '2013-07-09', annualRate: 8.00 },
+  { startDate: '2013-07-10', endDate: '2013-08-27', annualRate: 8.50 },
+  { startDate: '2013-08-28', endDate: '2013-10-08', annualRate: 9.00 },
+  { startDate: '2013-10-09', endDate: '2013-11-26', annualRate: 9.50 },
+  { startDate: '2013-11-27', endDate: '2014-01-14', annualRate: 10.00 },
+  { startDate: '2014-01-15', endDate: '2014-02-25', annualRate: 10.50 },
+  { startDate: '2014-02-26', endDate: '2014-04-01', annualRate: 10.75 },
+  { startDate: '2014-04-02', endDate: '2014-10-28', annualRate: 11.00 },
+  { startDate: '2014-10-29', endDate: '2014-12-02', annualRate: 11.25 },
+  { startDate: '2014-12-03', endDate: '2015-01-20', annualRate: 11.75 },
+  { startDate: '2015-01-21', endDate: '2015-03-03', annualRate: 12.25 },
+  { startDate: '2015-03-04', endDate: '2015-04-28', annualRate: 12.75 },
+  { startDate: '2015-04-29', endDate: '2015-06-02', annualRate: 13.25 },
+  { startDate: '2015-06-03', endDate: '2015-07-28', annualRate: 13.75 },
+  { startDate: '2015-07-29', endDate: '2016-10-18', annualRate: 14.25 },
+  { startDate: '2016-10-19', endDate: '2016-11-29', annualRate: 14.00 },
+  { startDate: '2016-11-30', endDate: '2017-01-10', annualRate: 13.75 },
+  { startDate: '2017-01-11', endDate: '2017-02-21', annualRate: 13.00 },
+  { startDate: '2017-02-22', endDate: '2017-04-11', annualRate: 12.25 },
+  { startDate: '2017-04-12', endDate: '2017-05-30', annualRate: 11.25 },
+  { startDate: '2017-05-31', endDate: '2017-07-25', annualRate: 10.25 },
+  { startDate: '2017-07-26', endDate: '2017-09-05', annualRate: 9.25 },
+  { startDate: '2017-09-06', endDate: '2017-10-24', annualRate: 8.25 },
+  { startDate: '2017-10-25', endDate: '2017-12-05', annualRate: 7.50 },
+  { startDate: '2017-12-06', endDate: '2018-02-06', annualRate: 7.00 },
+  { startDate: '2018-02-07', endDate: '2018-03-20', annualRate: 6.75 },
+  { startDate: '2018-03-21', endDate: '2019-07-30', annualRate: 6.50 },
+  { startDate: '2019-07-31', endDate: '2019-09-17', annualRate: 6.00 },
+  { startDate: '2019-09-18', endDate: '2019-10-29', annualRate: 5.50 },
+  { startDate: '2019-10-30', endDate: '2019-12-04', annualRate: 5.00 },
+  { startDate: '2019-12-05', endDate: '2020-02-04', annualRate: 4.50 },
+  { startDate: '2020-02-05', endDate: '2020-03-17', annualRate: 4.25 },
+  { startDate: '2020-03-18', endDate: '2020-05-05', annualRate: 3.75 },
+  { startDate: '2020-05-06', endDate: '2020-06-16', annualRate: 3.00 },
+  { startDate: '2020-06-17', endDate: '2020-08-04', annualRate: 2.25 },
+  { startDate: '2020-08-05', endDate: '2021-03-16', annualRate: 2.00 },
+  { startDate: '2021-03-17', endDate: '2021-05-04', annualRate: 2.75 },
+  { startDate: '2021-05-05', endDate: '2021-06-15', annualRate: 3.50 },
+  { startDate: '2021-06-16', endDate: '2021-08-03', annualRate: 4.25 },
+  { startDate: '2021-08-04', endDate: '2021-09-21', annualRate: 5.25 },
+  { startDate: '2021-09-22', endDate: '2021-10-26', annualRate: 6.25 },
+  { startDate: '2021-10-27', endDate: '2021-12-07', annualRate: 7.75 },
+  { startDate: '2021-12-08', endDate: '2022-02-01', annualRate: 9.25 },
+  { startDate: '2022-02-02', endDate: '2022-03-15', annualRate: 10.75 },
+  { startDate: '2022-03-16', endDate: '2022-05-03', annualRate: 11.75 },
+  { startDate: '2022-05-04', endDate: '2022-06-14', annualRate: 12.75 },
+  { startDate: '2022-06-15', endDate: '2022-08-02', annualRate: 13.25 },
+  { startDate: '2022-08-03', endDate: '2023-08-01', annualRate: 13.75 },
+  { startDate: '2023-08-02', endDate: '2023-09-19', annualRate: 13.25 },
+  { startDate: '2023-09-20', endDate: '2023-10-31', annualRate: 12.75 },
+  { startDate: '2023-11-01', endDate: '2023-12-12', annualRate: 12.25 },
+  { startDate: '2023-12-13', endDate: '2024-01-30', annualRate: 11.75 },
+  { startDate: '2024-01-31', endDate: '2024-03-19', annualRate: 11.25 },
+  { startDate: '2024-03-20', endDate: '2024-05-07', annualRate: 10.75 },
+  { startDate: '2024-05-08', endDate: '2024-09-17', annualRate: 10.50 },
+  { startDate: '2024-09-18', endDate: '2024-11-05', annualRate: 10.75 },
+  { startDate: '2024-11-06', endDate: '2024-12-10', annualRate: 11.25 },
+  { startDate: '2024-12-11', endDate: '2025-01-28', annualRate: 12.25 },
+  { startDate: '2025-01-29', endDate: '2025-05-07', annualRate: 13.25 },
+  { startDate: '2025-05-08', endDate: '2025-06-19', annualRate: 14.75 },
+  { startDate: '2025-06-20', endDate: '2026-03-17', annualRate: 15.00 },
+  { startDate: '2026-03-18', endDate: '2026-04-28', annualRate: 14.75 },
+  { startDate: '2026-04-29', endDate: '2026-08-05', annualRate: 14.50 },
+  { startDate: '2026-08-06', endDate: '2099-12-31', annualRate: 14.00 },
 ];
 
 /**
- * Get the CDI rate for a specific year
- * Returns the accumulated annual CDI rate
- */
-export function getCDIRateForYear(year: number): number {
-  const rate = HISTORICAL_CDI_RATES.find(r => r.year === year);
-  if (rate) {
-    return rate.annualRate;
-  }
-  // For years before 2015, use a reasonable average
-  if (year < 2015) {
-    return 10.0; // Historical average approximation
-  }
-  // For future years, use the most recent rate
-  const latestRate = HISTORICAL_CDI_RATES[HISTORICAL_CDI_RATES.length - 1];
-  return latestRate.annualRate;
-}
-
-/**
- * Get the monthly CDI rate for a specific month/year
- */
-export function getMonthlyCDIRate(year: number, month: number): number | null {
-  const rate = MONTHLY_CDI_RATES.find(r => r.year === year && r.month === month);
-  return rate ? rate.rate : null;
-}
-
-/**
- * Calculate compound CDI return for a date range using historical monthly rates
- * This provides more accurate calculations for past investments
- * 
- * @param startDate - Investment start date
- * @param endDate - End date for calculation (or today)
- * @param cdiPercentage - Percentage of CDI (e.g., 110 for 110% CDI)
- * @param currentCDIRate - Current CDI rate for months without historical data
- * @returns The compound factor to multiply by initial value
+ * Calcula o fator de retorno composto de um investimento atrelado ao CDI
+ * entre duas datas, usando a tabela histórica de taxas.
+ *
+ * @param startDate Data inicial
+ * @param endDate Data final (ou hoje)
+ * @param cdiPercentage Percentual do CDI (ex.: 100, 110)
+ * @param fallbackRate Taxa anual para datas fora da tabela (pré-2010 ou pós-última)
+ * @returns Fator multiplicador (ex.: 1.12 = 12% de rendimento)
  */
 export function calculateHistoricalCDIReturn(
   startDate: Date,
   endDate: Date,
   cdiPercentage: number,
-  currentCDIRate: number
+  fallbackRate: number = 14.0
 ): number {
-  let compoundFactor = 1;
-  
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  
-  // Iterate through each month
-  let current = new Date(start.getFullYear(), start.getMonth(), 1);
-  
-  while (current <= end) {
-    const year = current.getFullYear();
-    const month = current.getMonth() + 1; // 1-12
-    
-    // Get the monthly rate
-    let monthlyRate = getMonthlyCDIRate(year, month);
-    
-    if (monthlyRate === null) {
-      // Use current CDI rate converted to monthly for months without historical data
-      // Monthly rate from annual: (1 + annual/100)^(1/12) - 1
-      monthlyRate = (Math.pow(1 + currentCDIRate / 100, 1 / 12) - 1) * 100;
+  const startMs = startDate.getTime();
+  const endMs = endDate.getTime();
+
+  if (endMs <= startMs) return 1.0;
+
+  let compoundFactor = 1.0;
+
+  // Datas antes do primeiro período (pré-2010)
+  const firstPeriodStart = new Date(HISTORICAL_CDI_PERIODS[0].startDate + 'T00:00:00').getTime();
+  if (startMs < firstPeriodStart) {
+    const preEndMs = Math.min(endMs, firstPeriodStart);
+    const preDays = (preEndMs - startMs) / (1000 * 60 * 60 * 24);
+    if (preDays > 0) {
+      const effRate = (HISTORICAL_CDI_PERIODS[0].annualRate * cdiPercentage) / 100;
+      compoundFactor *= Math.pow(1 + effRate / 100, preDays / 365);
     }
-    
-    // Calculate days in this month that are within the investment period
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 0); // Last day of month
-    
-    const effectiveStart = start > monthStart ? start : monthStart;
-    const effectiveEnd = end < monthEnd ? end : monthEnd;
-    
-    if (effectiveStart <= effectiveEnd) {
-      const daysInMonth = monthEnd.getDate();
-      const effectiveDays = Math.floor((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      
-      // Pro-rata the monthly rate based on days
-      const proRataRate = (monthlyRate * effectiveDays) / daysInMonth;
-      
-      // Apply the CDI percentage (e.g., 110% of CDI)
-      const adjustedRate = (proRataRate * cdiPercentage) / 100;
-      
-      compoundFactor *= (1 + adjustedRate / 100);
-    }
-    
-    // Move to next month
-    current.setMonth(current.getMonth() + 1);
   }
-  
+
+  // Percorre os períodos e aplica a taxa proporcional aos dias sobrepostos
+  for (const period of HISTORICAL_CDI_PERIODS) {
+    const pStartMs = new Date(period.startDate + 'T00:00:00').getTime();
+    const pEndMs = new Date(period.endDate + 'T23:59:59').getTime();
+
+    const effStartMs = Math.max(startMs, pStartMs);
+    const effEndMs = Math.min(endMs, pEndMs);
+
+    if (effStartMs < effEndMs) {
+      const days = (effEndMs - effStartMs) / (1000 * 60 * 60 * 24);
+      const effectiveAnnualRate = (period.annualRate * cdiPercentage) / 100;
+      compoundFactor *= Math.pow(1 + effectiveAnnualRate / 100, days / 365);
+    }
+
+    if (effEndMs >= endMs) break; // já alcançou a data final
+  }
+
+  // Datas após o último período
+  const lastPeriodEnd = new Date(
+    HISTORICAL_CDI_PERIODS[HISTORICAL_CDI_PERIODS.length - 1].endDate + 'T23:59:59'
+  ).getTime();
+
+  if (endMs > lastPeriodEnd) {
+    const postStartMs = Math.max(startMs, lastPeriodEnd);
+    const postDays = (endMs - postStartMs) / (1000 * 60 * 60 * 24);
+    if (postDays > 0) {
+      const effRate = (fallbackRate * cdiPercentage) / 100;
+      compoundFactor *= Math.pow(1 + effRate / 100, postDays / 365);
+    }
+  }
+
   return compoundFactor;
 }
 
 /**
- * Get the weighted average CDI for a date range
- * Useful for displaying to users
+ * Retorna a taxa média anual equivalente a um período, para exibição.
  */
-export function getAverageCDIForPeriod(startDate: Date, endDate: Date, currentCDIRate: number): number {
-  const factor = calculateHistoricalCDIReturn(startDate, endDate, 100, currentCDIRate);
+export function getAverageCDIForPeriod(
+  startDate: Date,
+  endDate: Date,
+  fallbackRate: number = 14.0
+): number {
+  const factor = calculateHistoricalCDIReturn(startDate, endDate, 100, fallbackRate);
   const days = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (days <= 0) return currentCDIRate;
-  
-  // Convert compound factor back to annual rate
-  const annualRate = (Math.pow(factor, 365 / days) - 1) * 100;
-  return annualRate;
+
+  if (days <= 0) return fallbackRate;
+  return (Math.pow(factor, 365 / days) - 1) * 100;
 }
