@@ -1,12 +1,13 @@
 export interface CDIPeriod {
   startDate: string; // YYYY-MM-DD
   endDate: string;   // YYYY-MM-DD
-  annualRate: number; // taxa anual em %
+  annualRate: number; // taxa Selic anual em %
 }
 
 /**
- * Tabela oficial de decisões COPOM / CDI desde 2010.
- * Cada período define a taxa anual vigente entre as datas.
+ * Tabela oficial de decisões COPOM / Selic desde 2010.
+ * Os valores são a taxa Selic (meta), que serve como aproximação do CDI.
+ * Para converter para CDI, aplicamos um spread médio de -0,10 p.p. na função de cálculo.
  */
 export const HISTORICAL_CDI_PERIODS: CDIPeriod[] = [
   { startDate: '2010-01-28', endDate: '2010-04-28', annualRate: 8.75 },
@@ -97,12 +98,13 @@ export const HISTORICAL_CDI_PERIODS: CDIPeriod[] = [
 
 /**
  * Calcula o fator de retorno composto de um investimento atrelado ao CDI
- * entre duas datas, usando a tabela histórica de taxas.
+ * entre duas datas, usando a tabela histórica de taxas Selic.
+ * Aplica um spread médio de -0,10 p.p. para estimar o CDI.
  *
  * @param startDate Data inicial
  * @param endDate Data final (ou hoje)
  * @param cdiPercentage Percentual do CDI (ex.: 100, 110)
- * @param fallbackRate Taxa anual para datas fora da tabela (pré-2010 ou pós-última)
+ * @param fallbackRate Taxa anual para datas fora da tabela (pré-2010 ou pós-última) - já é CDI
  * @returns Fator multiplicador (ex.: 1.12 = 12% de rendimento)
  */
 export function calculateHistoricalCDIReturn(
@@ -117,6 +119,7 @@ export function calculateHistoricalCDIReturn(
   if (endMs <= startMs) return 1.0;
 
   let compoundFactor = 1.0;
+  const SELIC_TO_CDI_SPREAD = 0.10; // 0,10 p.p.
 
   // Datas antes do primeiro período (pré-2010)
   const firstPeriodStart = new Date(HISTORICAL_CDI_PERIODS[0].startDate + 'T00:00:00').getTime();
@@ -124,7 +127,9 @@ export function calculateHistoricalCDIReturn(
     const preEndMs = Math.min(endMs, firstPeriodStart);
     const preDays = (preEndMs - startMs) / (1000 * 60 * 60 * 24);
     if (preDays > 0) {
-      const effRate = (HISTORICAL_CDI_PERIODS[0].annualRate * cdiPercentage) / 100;
+      const selicRate = HISTORICAL_CDI_PERIODS[0].annualRate;
+      const cdiRate = Math.max(0, selicRate - SELIC_TO_CDI_SPREAD);
+      const effRate = (cdiRate * cdiPercentage) / 100;
       compoundFactor *= Math.pow(1 + effRate / 100, preDays / 365);
     }
   }
@@ -139,7 +144,9 @@ export function calculateHistoricalCDIReturn(
 
     if (effStartMs < effEndMs) {
       const days = (effEndMs - effStartMs) / (1000 * 60 * 60 * 24);
-      const effectiveAnnualRate = (period.annualRate * cdiPercentage) / 100;
+      const selicRate = period.annualRate;
+      const cdiRate = Math.max(0, selicRate - SELIC_TO_CDI_SPREAD);
+      const effectiveAnnualRate = (cdiRate * cdiPercentage) / 100;
       compoundFactor *= Math.pow(1 + effectiveAnnualRate / 100, days / 365);
     }
 
@@ -155,7 +162,7 @@ export function calculateHistoricalCDIReturn(
     const postStartMs = Math.max(startMs, lastPeriodEnd);
     const postDays = (endMs - postStartMs) / (1000 * 60 * 60 * 24);
     if (postDays > 0) {
-      const effRate = (fallbackRate * cdiPercentage) / 100;
+      const effRate = (fallbackRate * cdiPercentage) / 100; // fallbackRate já é CDI
       compoundFactor *= Math.pow(1 + effRate / 100, postDays / 365);
     }
   }
@@ -165,6 +172,7 @@ export function calculateHistoricalCDIReturn(
 
 /**
  * Retorna a taxa média anual equivalente a um período, para exibição.
+ * O valor retornado é uma estimativa do CDI (já descontado o spread).
  */
 export function getAverageCDIForPeriod(
   startDate: Date,
