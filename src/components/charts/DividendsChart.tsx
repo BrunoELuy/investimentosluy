@@ -37,6 +37,48 @@ interface MonthDataPoint {
   [key: string]: number | string;
 }
 
+// Componente customizado para o Tooltip
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload || payload.length === 0) return null;
+
+  // Filtra apenas itens com valor > 0
+  const filtered = payload.filter((entry: any) => (entry.value ?? 0) > 0);
+
+  if (filtered.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border bg-background/95 p-3 shadow-xl backdrop-blur-sm">
+      <p className="mb-2 text-sm font-semibold text-foreground">Mês: {label}</p>
+      <div className="space-y-1.5">
+        {filtered.map((entry: any, index: number) => {
+          // Extrai ticker e tipo a partir do dataKey (ex.: BBSE3_DIV)
+          const parts = entry.dataKey.split('_');
+          const type = parts[parts.length - 1]; // DIV ou JCP
+          const ticker = parts.slice(0, -1).join('_');
+          const labelText = type === 'DIV' ? 'Dividendo' : 'JCP';
+          const color = entry.color || entry.fill || '#10b981';
+
+          return (
+            <div key={index} className="flex items-center justify-between gap-4 text-xs">
+              <span className="flex items-center gap-2 text-muted-foreground">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="font-medium text-foreground">{ticker}</span>
+                <span className="text-muted-foreground">— {labelText}</span>
+              </span>
+              <span className="font-mono font-semibold text-foreground">
+                {formatCurrency(entry.value)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 export function DividendsChart() {
   const { data: dividends = [], isLoading } = useDividendPayments();
 
@@ -54,7 +96,6 @@ export function DividendsChart() {
     return Array.from(years).sort((a, b) => b - a);
   }, [dividends]);
 
-  // Ajusta o ano selecionado se o atual não existir nos dados
   useEffect(() => {
     if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
       setSelectedYear(availableYears[0]);
@@ -194,8 +235,8 @@ export function DividendsChart() {
                   key={ticker}
                   onClick={() => toggleTicker(ticker)}
                   className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all ${isActive
-                    ? 'text-white border-transparent shadow-sm'
-                    : 'bg-background text-muted-foreground border-border hover:border-foreground/40'
+                      ? 'text-white border-transparent shadow-sm'
+                      : 'bg-background text-muted-foreground border-border hover:border-foreground/40'
                     }`}
                   style={isActive ? { backgroundColor: color, borderColor: color } : {}}
                 >
@@ -253,17 +294,7 @@ export function DividendsChart() {
                 tickFormatter={v => (v === 0 ? '' : `R$${v.toFixed(0)}`)}
                 width={60}
               />
-              <Tooltip
-                formatter={(value: number, name: string) => {
-                  if (value <= 0) return null; // omite itens sem pagamento
-                  const parts = name.split('_');
-                  const type = parts[parts.length - 1];
-                  const ticker = parts.slice(0, -1).join('_');
-                  const label = type === 'DIV' ? `${ticker} — Dividendo` : `${ticker} — JCP`;
-                  return [formatCurrency(value), label];
-                }}
-                labelFormatter={(label: string) => `Mês: ${label}`}
-              />
+              <Tooltip content={<CustomTooltip />} />
               <Legend
                 formatter={(value: string) => {
                   const parts = value.split('_');
