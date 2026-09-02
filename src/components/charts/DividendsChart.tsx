@@ -194,8 +194,8 @@ export function DividendsChart() {
                   key={ticker}
                   onClick={() => toggleTicker(ticker)}
                   className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all ${isActive
-                      ? 'text-white border-transparent shadow-sm'
-                      : 'bg-background text-muted-foreground border-border hover:border-foreground/40'
+                    ? 'text-white border-transparent shadow-sm'
+                    : 'bg-background text-muted-foreground border-border hover:border-foreground/40'
                     }`}
                   style={isActive ? { backgroundColor: color, borderColor: color } : {}}
                 >
@@ -255,11 +255,12 @@ export function DividendsChart() {
               />
               <Tooltip
                 formatter={(value: number, name: string) => {
+                  if (value <= 0) return null; // omite itens sem pagamento
                   const parts = name.split('_');
                   const type = parts[parts.length - 1];
                   const ticker = parts.slice(0, -1).join('_');
                   const label = type === 'DIV' ? `${ticker} — Dividendo` : `${ticker} — JCP`;
-                  return value > 0 ? [formatCurrency(value), label] : ['', label];
+                  return [formatCurrency(value), label];
                 }}
                 labelFormatter={(label: string) => `Mês: ${label}`}
               />
