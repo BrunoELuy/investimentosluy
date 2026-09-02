@@ -18,6 +18,8 @@ import {
 } from 'recharts';
 import type { InvestmentCalculation } from '@/types/investment';
 import { formatCurrency, formatPercent, calculateGrossReturn } from '@/utils/investmentCalculations';
+import { DividendsChart } from './DividendsChart';
+
 
 interface PortfolioChartsProps {
   calculations: InvestmentCalculation[];
@@ -378,6 +380,9 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
           </div>
         </CardContent>
       </Card>
+
+      {/* Dividends & JCP Monthly Chart */}
+      <DividendsChart />
     </div>
   );
 }
