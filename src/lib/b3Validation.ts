@@ -7,19 +7,20 @@ export interface B3Validation {
   warnings: string[];
 }
 
-/** Columns we need for each supported statement */
+/** Colunas obrigatórias para cada tipo de relatório suportado */
 export const REQUIRED_COLUMNS: Record<Exclude<B3ReportType, 'DESCONHECIDO'>, string[]> = {
+  MOVIMENTACAO: ['Produto', 'Data', 'Movimentação', 'Entrada/Saída', 'Valor da Operação'],
   ACOES: ['Produto', 'Código de Negociação', 'Quantidade'],
   RENDA_FIXA: ['Produto', 'Vencimento'],
   NEGOCIACAO: ['Produto', 'Data do Negócio', 'Quantidade'],
-  MOVIMENTACAO: ['Data', 'Produto', 'Movimentação', 'Entrada/Saída', 'Valor da Operação'],
 };
 
+/** Colunas opcionais para cada tipo de relatório */
 export const OPTIONAL_COLUMNS: Record<Exclude<B3ReportType, 'DESCONHECIDO'>, string[]> = {
+  MOVIMENTACAO: ['Instituição', 'Quantidade', 'Preço unitário'],
   ACOES: ['Instituição', 'Preço de Fechamento', 'Valor Atualizado'],
   RENDA_FIXA: ['Emissor', 'Indexador', 'Quantidade', 'Valor Atualizado MTM', 'Valor Aplicado'],
   NEGOCIACAO: ['Instituição', 'Tipo de Movimentação', 'Preço', 'Valor'],
-  MOVIMENTACAO: ['Instituição', 'Quantidade', 'Preço unitário'],
 };
 
 function hasColumn(headers: string[], column: string): boolean {
@@ -31,46 +32,44 @@ export function validateB3File(result: B3ParseResult): B3Validation {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Garantir que positions seja sempre um array
-  const positions = result.positions ?? [];
-  const headers = result.headers ?? [];
-
-  if (!headers.length) {
+  if (!result.headers.length) {
     errors.push('Não foi possível localizar a linha de cabeçalho na planilha. Envie o arquivo original exportado pela B3, sem edições.');
     return { valid: false, errors, warnings };
   }
 
   if (result.reportType === 'DESCONHECIDO') {
     errors.push(
-      'Formato não reconhecido. Use os relatórios "Posição - Ações/BDRs", "Posição - Renda Fixa", "Negociação" ou "Movimentação" exportados em Excel pelo portal do Investidor B3.'
+      'Formato não reconhecido. Use o extrato de Movimentação ou os relatórios "Posição - Ações/BDRs", "Posição - Renda Fixa" ou "Negociação" exportados em Excel pela B3.'
     );
     return { valid: false, errors, warnings };
   }
 
-  // Como reportType já foi checado, podemos acessar as constantes com segurança
-  const required = REQUIRED_COLUMNS[result.reportType];
-  const optional = OPTIONAL_COLUMNS[result.reportType];
-
-  const missing = required.filter(c => !hasColumn(headers, c));
+  const requiredCols = REQUIRED_COLUMNS[result.reportType] || [];
+  const missing = requiredCols.filter(c => !hasColumn(result.headers, c));
   if (missing.length) {
     errors.push(`Colunas obrigatórias ausentes: ${missing.join(', ')}.`);
   }
 
-  const missingOptional = optional.filter(c => !hasColumn(headers, c));
+  const optionalCols = OPTIONAL_COLUMNS[result.reportType] || [];
+  const missingOptional = optionalCols.filter(c => !hasColumn(result.headers, c));
   if (missingOptional.length) {
     warnings.push(`Colunas opcionais não encontradas (a conferência pode ficar incompleta): ${missingOptional.join(', ')}.`);
   }
 
-  if (positions.length === 0 && result.reportType !== 'MOVIMENTACAO') {
+  if (result.reportType === 'MOVIMENTACAO') {
+    const movementsCount = result.movements?.length ?? 0;
+    if (movementsCount === 0) {
+      errors.push('Nenhuma movimentação válida foi encontrada no extrato.');
+    }
+    return { valid: errors.length === 0, errors, warnings };
+  }
+
+  if (!result.positions.length) {
     errors.push('Nenhuma posição válida foi encontrada nas linhas do arquivo.');
   }
 
-  if (result.reportType === 'MOVIMENTACAO' && !result.consolidation) {
-    errors.push('Não foi possível consolidar as movimentações. Verifique se o arquivo contém dados válidos.');
-  }
-
-  const withoutValue = positions.filter(p => p.totalValue === undefined && p.quantity === undefined).length;
-  if (withoutValue > 0 && result.reportType !== 'MOVIMENTACAO') {
+  const withoutValue = result.positions.filter(p => p.totalValue === undefined && p.quantity === undefined).length;
+  if (withoutValue > 0) {
     warnings.push(`${withoutValue} linha(s) sem quantidade nem valor — serão ignoradas na conciliação.`);
   }
 
