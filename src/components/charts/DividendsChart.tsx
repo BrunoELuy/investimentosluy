@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   BarChart,
   Bar,
@@ -53,6 +53,13 @@ export function DividendsChart() {
     if (years.size === 0) years.add(today.getFullYear());
     return Array.from(years).sort((a, b) => b - a);
   }, [dividends]);
+
+  // Ajusta o ano selecionado se o atual não existir nos dados
+  useEffect(() => {
+    if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
+      setSelectedYear(availableYears[0]);
+    }
+  }, [availableYears, selectedYear]);
 
   const allTickers = useMemo(() => {
     const tickers = new Set<string>();
@@ -243,7 +250,7 @@ export function DividendsChart() {
               <XAxis dataKey="month" fontSize={12} />
               <YAxis
                 fontSize={11}
-                tickFormatter={v => v === 0 ? '' : `R$${v.toFixed(0)}`}
+                tickFormatter={v => (v === 0 ? '' : `R$${v.toFixed(0)}`)}
                 width={60}
               />
               <Tooltip
@@ -252,7 +259,7 @@ export function DividendsChart() {
                   const type = parts[parts.length - 1];
                   const ticker = parts.slice(0, -1).join('_');
                   const label = type === 'DIV' ? `${ticker} — Dividendo` : `${ticker} — JCP`;
-                  return value > 0 ? [formatCurrency(value), label] : null;
+                  return value > 0 ? [formatCurrency(value), label] : ['', label];
                 }}
                 labelFormatter={(label: string) => `Mês: ${label}`}
               />
@@ -265,7 +272,7 @@ export function DividendsChart() {
                 }}
                 wrapperStyle={{ fontSize: '11px' }}
               />
-              {activeTickers.map(ticker => {
+              {activeTickers.flatMap(ticker => {
                 const color = getTickerColor(allTickers, ticker);
                 return [
                   <Bar
