@@ -50,6 +50,51 @@ export type Database = {
         }
         Relationships: []
       }
+      dividend_payments: {
+        Row: {
+          asset_name: string | null
+          created_at: string | null
+          date: string
+          id: string
+          institution: string | null
+          quantity: number | null
+          ticker: string
+          total_amount: number
+          type: string
+          type_label: string | null
+          unit_price: number | null
+          user_id: string
+        }
+        Insert: {
+          asset_name?: string | null
+          created_at?: string | null
+          date: string
+          id: string
+          institution?: string | null
+          quantity?: number | null
+          ticker: string
+          total_amount: number
+          type: string
+          type_label?: string | null
+          unit_price?: number | null
+          user_id: string
+        }
+        Update: {
+          asset_name?: string | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          institution?: string | null
+          quantity?: number | null
+          ticker?: string
+          total_amount?: number
+          type?: string
+          type_label?: string | null
+          unit_price?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       economic_rates: {
         Row: {
           created_at: string
