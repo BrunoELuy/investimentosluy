@@ -31,6 +31,59 @@ export interface B3Import {
   summary: unknown;
 }
 
+// ============ Mapeamento DB <-> DividendPayment ============
+
+interface DividendRow {
+  id: string;
+  user_id: string;
+  date: string;
+  ticker: string;
+  asset_name: string | null;
+  type: string;
+  type_label: string | null;
+  institution: string | null;
+  quantity: number | null;
+  unit_price: number | null;
+  total_amount: number;
+  created_at: string;
+}
+
+function rowToDividend(row: DividendRow): DividendPayment {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    date: row.date,
+    ticker: row.ticker,
+    assetName: row.asset_name ?? '',
+    type: row.type as DividendPayment['type'],
+    typeLabel: row.type_label ?? row.type,
+    institution: row.institution ?? '',
+    quantity: Number(row.quantity) || 0,
+    unitPrice: Number(row.unit_price) || 0,
+    totalAmount: Number(row.total_amount),
+    created_at: row.created_at,
+  };
+}
+
+function dividendToRow(d: DividendPayment, userId: string): DividendRow {
+  return {
+    id: d.id,
+    user_id: userId,
+    date: d.date,
+    ticker: d.ticker,
+    asset_name: d.assetName,
+    type: d.type,
+    type_label: d.typeLabel,
+    institution: d.institution,
+    quantity: d.quantity,
+    unit_price: d.unitPrice,
+    total_amount: d.totalAmount,
+    created_at: d.created_at ?? new Date().toISOString(),
+  };
+}
+
+// ============ Hooks de leitura ============
+
 export function useB3Imports() {
   const { user } = useAuth();
 
@@ -50,6 +103,11 @@ export function useB3Imports() {
   });
 }
 
+/**
+ * Busca dividendos locais e remotos, mescla e mantém o IndexedDB atualizado.
+ * - Local é usado como cache offline.
+ * - Remoto é a fonte de verdade para sincronização cross-device.
+ */
 export function useDividendPayments() {
   const { user } = useAuth();
 
@@ -57,11 +115,44 @@ export function useDividendPayments() {
     queryKey: ['dividend-payments', user?.id],
     queryFn: async (): Promise<DividendPayment[]> => {
       const local = await getLocalDividends(user?.id);
+
+      if (isOnline() && user) {
+        try {
+          const { data, error } = await supabase
+            .from('dividend_payments')
+            .select('*')
+            .eq('user_id', user.id);
+
+          if (!error && data) {
+            const remote = (data as DividendRow[]).map(rowToDividend);
+
+            // Mescla por id (remoto vence em caso de conflito)
+            const map = new Map<string, DividendPayment>();
+            for (const d of local) map.set(d.id, d);
+            for (const d of remote) map.set(d.id, d);
+
+            const merged = Array.from(map.values());
+
+            // Atualiza cache local com o estado consolidado
+            if (merged.length > 0) {
+              await saveLocalDividends(merged);
+            }
+
+            return merged.sort((a, b) => b.date.localeCompare(a.date));
+          }
+        } catch (err) {
+          // Falha silenciosa: cai para o local
+          console.warn('[useDividendPayments] Erro ao buscar remoto:', err);
+        }
+      }
+
       return local.sort((a, b) => b.date.localeCompare(a.date));
     },
     enabled: !!user,
   });
 }
+
+// ============ Hooks de escrita ============
 
 export function useRegisterB3Import() {
   const queryClient = useQueryClient();
@@ -93,11 +184,11 @@ export function useRegisterB3Import() {
 }
 
 /**
- * Imports full B3 consolidated movements:
- * - Active Stocks (non-zero): creates or updates positions.
- * - Active Fixed Income (non-zero): creates or updates positions + deposits.
- * - Zero balance positions: NOT created/added.
- * - Dividends/JCP: 100% saved and persisted regardless of whether asset is zeroed.
+ * Importa o extrato de movimentações B3:
+ * - Ações ativas: cria/atualiza posições.
+ * - Renda fixa ativa: cria/atualiza posições + aportes.
+ * - Posições zeradas: não criadas.
+ * - Proventos: salvos localmente E no Supabase (cross-device).
  */
 export function useImportB3Movements() {
   const queryClient = useQueryClient();
@@ -118,18 +209,34 @@ export function useImportB3Movements() {
       const now = new Date().toISOString();
       const today = now.split('T')[0];
 
-      // 1. Process and save all dividends (including zero-balance assets)
-      const userDividends = dividends.map(d => ({
+      // 1. Salva dividendos localmente
+      const userDividends: DividendPayment[] = dividends.map(d => ({
         ...d,
         user_id: user.id,
-        created_at: now,
+        created_at: d.created_at ?? now,
       }));
       await saveLocalDividends(userDividends);
+
+      // 2. Espelha dividendos no Supabase (cross-device)
+      if (isOnline() && userDividends.length > 0) {
+        try {
+          const rows = userDividends.map(d => dividendToRow(d, user.id));
+          const { error } = await supabase
+            .from('dividend_payments')
+            .upsert(rows, { onConflict: 'user_id,id' });
+          if (error) {
+            console.warn('[useImportB3Movements] Erro ao salvar dividendos no Supabase:', error.message);
+          }
+        } catch (err) {
+          // Não bloqueia a importação por causa do sync de dividendos
+          console.warn('[useImportB3Movements] Falha ao sincronizar dividendos:', err);
+        }
+      }
 
       let createdCount = 0;
       let updatedCount = 0;
 
-      // 2. Process non-zero Stocks
+      // 3. Ações ativas
       const activeStocks = stocks.filter(s => !s.isZeroBalance && s.totalQuantity > 0);
       for (const stock of activeStocks) {
         const existing = existingInvestments.find(
@@ -137,7 +244,6 @@ export function useImportB3Movements() {
         );
 
         if (existing) {
-          // Update existing stock
           const updatePayload = {
             quantity: stock.totalQuantity,
             initial_value: stock.totalInvested,
@@ -146,14 +252,12 @@ export function useImportB3Movements() {
             b3_source: 'MOVIMENTACAO',
             updated_at: now,
           };
-
           if (isOnline()) {
             await supabase.from('investments').update(updatePayload).eq('id', existing.id);
           }
           await saveLocalInvestment({ ...existing, ...updatePayload });
           updatedCount++;
         } else {
-          // Create new stock
           const newId = crypto.randomUUID();
           const newStock = {
             id: newId,
@@ -176,7 +280,6 @@ export function useImportB3Movements() {
             created_at: now,
             updated_at: now,
           };
-
           if (isOnline()) {
             await supabase.from('investments').insert(newStock);
           }
@@ -185,21 +288,20 @@ export function useImportB3Movements() {
         }
       }
 
-      // 3. Process non-zero Fixed Income (CDB / LCA)
+      // 4. Renda fixa ativa
       const activeFixedIncome = fixedIncome.filter(fi => !fi.isZeroBalance && fi.netInvested > 0);
       for (const fi of activeFixedIncome) {
         const existing = fi.existingInvestmentId
           ? existingInvestments.find(inv => inv.id === fi.existingInvestmentId)
           : existingInvestments.find(
-            inv =>
-              inv.type === fi.type &&
-              inv.institution.toLowerCase().includes(fi.institution.toLowerCase()) &&
-              inv.rate_type === fi.rateType &&
-              inv.rate_value === fi.rateValue
-          );
+              inv =>
+                inv.type === fi.type &&
+                inv.institution.toLowerCase().includes(fi.institution.toLowerCase()) &&
+                inv.rate_type === fi.rateType &&
+                inv.rate_value === fi.rateValue
+            );
 
         if (existing) {
-          // Update existing fixed income
           const updatePayload = {
             initial_value: fi.netInvested,
             last_verified_at: now,
@@ -207,13 +309,11 @@ export function useImportB3Movements() {
             b3_source: 'MOVIMENTACAO',
             updated_at: now,
           };
-
           if (isOnline()) {
             await supabase.from('investments').update(updatePayload).eq('id', existing.id);
           }
           await saveLocalInvestment({ ...existing, ...updatePayload });
 
-          // Insert new deposits if present
           if (fi.deposits.length > 0) {
             const newDeposits = fi.deposits.map(d => ({
               id: crypto.randomUUID(),
@@ -225,7 +325,6 @@ export function useImportB3Movements() {
               created_at: now,
               updated_at: now,
             }));
-
             if (isOnline()) {
               await supabase.from('investment_deposits').insert(newDeposits);
             }
@@ -233,9 +332,7 @@ export function useImportB3Movements() {
           }
           updatedCount++;
         } else {
-          // Create new fixed income investment
           const newId = crypto.randomUUID();
-          // The base initial value is either the net invested minus additional deposits or net invested
           const baseInitial = fi.deposits.length > 0
             ? Math.max(0, fi.netInvested - fi.deposits.reduce((sum, d) => sum + d.amount, 0)) || fi.netInvested
             : fi.netInvested;
@@ -259,13 +356,11 @@ export function useImportB3Movements() {
             created_at: now,
             updated_at: now,
           };
-
           if (isOnline()) {
             await supabase.from('investments').insert(newInvestment);
           }
           await saveLocalInvestment(newInvestment);
 
-          // Save deposits if any
           if (fi.deposits.length > 0) {
             const newDeposits = fi.deposits.map(d => ({
               id: crypto.randomUUID(),
@@ -277,7 +372,6 @@ export function useImportB3Movements() {
               created_at: now,
               updated_at: now,
             }));
-
             if (isOnline()) {
               await supabase.from('investment_deposits').insert(newDeposits);
             }
@@ -287,7 +381,7 @@ export function useImportB3Movements() {
         }
       }
 
-      // 4. Register B3 import log
+      // 5. Log da importação
       if (isOnline()) {
         try {
           await supabase.from('b3_imports').insert({
@@ -304,13 +398,13 @@ export function useImportB3Movements() {
             } as never,
           });
         } catch {
-          // Continue if import log fails
+          // segue em frente se o log falhar
         }
       }
 
       return { createdCount, updatedCount, dividendsCount: dividends.length };
     },
-    onSuccess: (data) => {
+    onSuccess: data => {
       queryClient.invalidateQueries({ queryKey: ['investments'] });
       queryClient.invalidateQueries({ queryKey: ['all-deposits'] });
       queryClient.invalidateQueries({ queryKey: ['dividend-payments'] });
@@ -330,6 +424,8 @@ export function useImportB3Movements() {
   });
 }
 
+// ============ Hooks auxiliares ============
+
 function inferRate(indexer?: string): { rate_type: RateType; rate_value: number } {
   const value = (indexer || '').toUpperCase();
   if (value.includes('IPCA')) return { rate_type: 'IPCA', rate_value: 5 };
@@ -338,7 +434,6 @@ function inferRate(indexer?: string): { rate_type: RateType; rate_value: number 
   return { rate_type: 'CDI', rate_value: 100 };
 }
 
-/** Creates an investment straight from a B3 statement row */
 export function useCreateFromB3() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -384,7 +479,6 @@ export function useCreateFromB3() {
   });
 }
 
-/** Applies the B3 values to an existing investment and stamps the verification */
 export function useApplyB3Row() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
