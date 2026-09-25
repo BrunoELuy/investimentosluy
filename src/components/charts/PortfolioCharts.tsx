@@ -14,12 +14,10 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  ResponsiveContainer
 } from 'recharts';
 import type { InvestmentCalculation } from '@/types/investment';
-import { formatCurrency, formatPercent, calculateGrossReturn } from '@/utils/investmentCalculations';
+import { formatCurrency, calculateGrossReturn } from '@/utils/investmentCalculations';
 import { DividendsChart } from './DividendsChart';
-
 
 interface PortfolioChartsProps {
   calculations: InvestmentCalculation[];
@@ -53,7 +51,8 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
   const institutionDistribution = useMemo(() => {
     const byInstitution: Record<string, number> = {};
     activeCalcs.forEach(c => {
-      byInstitution[c.investment.institution] = (byInstitution[c.investment.institution] || 0) + c.currentNetValue;
+      byInstitution[c.investment.institution] =
+        (byInstitution[c.investment.institution] || 0) + c.currentNetValue;
     });
 
     const colors = [
@@ -77,7 +76,10 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
   const performanceData = useMemo(() => {
     return activeCalcs
       .map(c => ({
-        name: c.investment.name.length > 20 ? c.investment.name.substring(0, 17) + '...' : c.investment.name,
+        name:
+          c.investment.name.length > 20
+            ? c.investment.name.substring(0, 17) + '...'
+            : c.investment.name,
         fullName: c.investment.name,
         grossPercent: c.grossReturnPercent,
         netPercent: c.netReturnPercent,
@@ -98,35 +100,35 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
 
       let totalGross = 0;
       let totalNet = 0;
-      let totalInvested = 0;
 
       for (const calc of activeCalcs) {
         const inv = calc.investment;
         const startDate = parseISO(inv.start_date);
         const endDate = parseISO(inv.end_date);
 
-        // Skip if investment hadn't started yet
         if (isAfter(startDate, monthEnd)) continue;
 
-        // Use the earlier of monthEnd or maturity date
         const calcEnd = isBefore(monthEnd, endDate) ? monthEnd : endDate;
         const days = Math.max(differenceInDays(calcEnd, startDate), 0);
 
-        // Initial value contribution
         let investedAtMonth = inv.initial_value;
         let grossReturn = 0;
 
         if (inv.type === 'ACAO') {
-          // For stocks, just accumulate invested amounts
           grossReturn = 0;
         } else if (days > 0) {
           grossReturn = calculateGrossReturn(
-            inv.initial_value, inv.rate_type, inv.rate_value,
-            days, cdiRate, ipcaRate, startDate, calcEnd
+            inv.initial_value,
+            inv.rate_type,
+            inv.rate_value,
+            days,
+            cdiRate,
+            ipcaRate,
+            startDate,
+            calcEnd
           );
         }
 
-        // Add deposits that existed by this month
         for (const dep of calc.deposits) {
           const depDate = parseISO(dep.deposit_date);
           if (isAfter(depDate, monthEnd)) continue;
@@ -138,19 +140,24 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
             const depDays = Math.max(differenceInDays(depEnd, depDate), 0);
             if (depDays > 0) {
               grossReturn += calculateGrossReturn(
-                dep.amount, inv.rate_type, inv.rate_value,
-                depDays, cdiRate, ipcaRate, depDate, depEnd
+                dep.amount,
+                inv.rate_type,
+                inv.rate_value,
+                depDays,
+                cdiRate,
+                ipcaRate,
+                depDate,
+                depEnd
               );
             }
           }
         }
 
-        totalInvested += investedAtMonth;
         totalGross += investedAtMonth + grossReturn;
-        // Simplified net: apply same ratio as current calc
-        const netRatio = calc.totalInvested > 0 && calc.grossReturn > 0
-          ? calc.netReturn / calc.grossReturn
-          : 1;
+        const netRatio =
+          calc.totalInvested > 0 && calc.grossReturn > 0
+            ? calc.netReturn / calc.grossReturn
+            : 1;
         totalNet += investedAtMonth + grossReturn * netRatio;
       }
 
@@ -180,208 +187,291 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
     netValue: { label: 'Líquido', color: 'hsl(var(--chart-2))' },
   };
 
-  if (activeCalcs.length === 0) {
-    return (
-      <Card>
-        <CardContent className="pt-6 text-center text-muted-foreground">
-          Adicione investimentos para visualizar os gráficos
-        </CardContent>
-      </Card>
-    );
-  }
+  // Quando não há investimentos ativos, mostramos um card amigável
+  // APENAS para os gráficos de carteira. O DividendsChart continua sendo exibido.
+  const hasActiveInvestments = activeCalcs.length > 0;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Type Distribution Pie */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Distribuição por Tipo</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfigType} className="h-[250px] w-full">
-            <PieChart>
-              <Pie
-                data={typeDistribution}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={100}
-                paddingAngle={2}
-                dataKey="value"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              >
-                {typeDistribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} />
+    <div className="space-y-6">
+      {hasActiveInvestments ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Type Distribution Pie */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Distribuição por Tipo</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={chartConfigType} className="h-[250px] w-full">
+                <PieChart>
+                  <Pie
+                    data={typeDistribution}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, percent }) =>
+                      `${name} ${(percent * 100).toFixed(0)}%`
+                    }
+                  >
+                    {typeDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        formatter={value => formatCurrency(value as number)}
+                      />
+                    }
+                  />
+                </PieChart>
+              </ChartContainer>
+              <div className="flex justify-center gap-6 mt-4">
+                {typeDistribution.map(d => (
+                  <div key={d.name} className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: d.fill }}
+                    />
+                    <span className="text-sm">
+                      {d.name}: {formatCurrency(d.value)}
+                    </span>
+                  </div>
                 ))}
-              </Pie>
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value) => formatCurrency(value as number)}
-                  />
-                }
-              />
-            </PieChart>
-          </ChartContainer>
-          <div className="flex justify-center gap-6 mt-4">
-            {typeDistribution.map(d => (
-              <div key={d.name} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: d.fill }} />
-                <span className="text-sm">{d.name}: {formatCurrency(d.value)}</span>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      {/* Institution Distribution Pie */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Distribuição por Instituição</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={{}} className="h-[300px] w-full">
-            <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-              <Pie
-                data={institutionDistribution}
-                cx="50%"
-                cy="50%"
-                outerRadius={90}
-                paddingAngle={2}
-                dataKey="value"
-                label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
-                labelLine={{ strokeWidth: 1 }}
-              >
-                {institutionDistribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} />
+          {/* Institution Distribution Pie */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Distribuição por Instituição</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={{}} className="h-[300px] w-full">
+                <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                  <Pie
+                    data={institutionDistribution}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={90}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                    labelLine={{ strokeWidth: 1 }}
+                  >
+                    {institutionDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        formatter={value => formatCurrency(value as number)}
+                      />
+                    }
+                  />
+                </PieChart>
+              </ChartContainer>
+              <div className="flex flex-wrap justify-center gap-4 mt-4">
+                {institutionDistribution.slice(0, 5).map(d => (
+                  <div key={d.name} className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: d.fill }}
+                    />
+                    <span className="text-sm">{d.name}</span>
+                  </div>
                 ))}
-              </Pie>
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value) => formatCurrency(value as number)}
-                  />
-                }
-              />
-            </PieChart>
-          </ChartContainer>
-          <div className="flex flex-wrap justify-center gap-4 mt-4">
-            {institutionDistribution.slice(0, 5).map(d => (
-              <div key={d.name} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: d.fill }} />
-                <span className="text-sm">{d.name}</span>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      {/* Performance Bar Chart */}
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle>Performance por Investimento (%)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfigPerformance} className="h-[300px] w-full">
-            <BarChart data={performanceData} layout="vertical" margin={{ left: 20, right: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={true} vertical={false} />
-              <XAxis type="number" tickFormatter={(v) => `${v.toFixed(1)}%`} />
-              <YAxis
-                type="category"
-                dataKey="name"
-                width={150}
-                tick={{ fontSize: 12 }}
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value, name) => {
-                      const label = name === 'grossPercent' ? 'Bruto' : 'Líquido';
-                      return [`${(value as number).toFixed(2)}%`, label];
-                    }}
+          {/* Performance Bar Chart */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Performance por Investimento (%)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={chartConfigPerformance}
+                className="h-[300px] w-full"
+              >
+                <BarChart
+                  data={performanceData}
+                  layout="vertical"
+                  margin={{ left: 20, right: 20 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    className="stroke-muted"
+                    horizontal={true}
+                    vertical={false}
                   />
-                }
-              />
-              <Bar dataKey="grossPercent" fill="hsl(var(--chart-1))" radius={[0, 4, 4, 0]} />
-              <Bar dataKey="netPercent" fill="hsl(var(--chart-2))" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ChartContainer>
-          <div className="flex justify-center gap-6 mt-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'hsl(var(--chart-1))' }} />
-              <span className="text-sm">Rendimento Bruto</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'hsl(var(--chart-2))' }} />
-              <span className="text-sm">Rendimento Líquido</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Monthly Evolution Area Chart */}
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle>Evolução da Carteira (Últimos 12 meses)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfigEvolution} className="h-[300px] w-full">
-            <AreaChart data={monthlyEvolution} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="grossGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="netGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={(v) => formatCurrency(v)} width={100} tick={{ fontSize: 12 }} />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value, name) => {
-                      const label = name === 'grossValue' ? 'Bruto' : 'Líquido';
-                      return [formatCurrency(value as number), label];
-                    }}
+                  <XAxis
+                    type="number"
+                    tickFormatter={v => `${v.toFixed(1)}%`}
                   />
-                }
-              />
-              <Area
-                type="monotone"
-                dataKey="grossValue"
-                stroke="hsl(var(--chart-1))"
-                fillOpacity={1}
-                fill="url(#grossGrad)"
-                strokeWidth={2}
-              />
-              <Area
-                type="monotone"
-                dataKey="netValue"
-                stroke="hsl(var(--chart-2))"
-                fillOpacity={1}
-                fill="url(#netGrad)"
-                strokeWidth={2}
-              />
-            </AreaChart>
-          </ChartContainer>
-          <div className="flex justify-center gap-6 mt-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'hsl(var(--chart-1))' }} />
-              <span className="text-sm">Valor Bruto</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'hsl(var(--chart-2))' }} />
-              <span className="text-sm">Valor Líquido</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={150}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value, name) => {
+                          const label =
+                            name === 'grossPercent' ? 'Bruto' : 'Líquido';
+                          return [
+                            `${(value as number).toFixed(2)}%`,
+                            label,
+                          ];
+                        }}
+                      />
+                    }
+                  />
+                  <Bar
+                    dataKey="grossPercent"
+                    fill="hsl(var(--chart-1))"
+                    radius={[0, 4, 4, 0]}
+                  />
+                  <Bar
+                    dataKey="netPercent"
+                    fill="hsl(var(--chart-2))"
+                    radius={[0, 4, 4, 0]}
+                  />
+                </BarChart>
+              </ChartContainer>
+              <div className="flex justify-center gap-6 mt-4">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: 'hsl(var(--chart-1))' }}
+                  />
+                  <span className="text-sm">Rendimento Bruto</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: 'hsl(var(--chart-2))' }}
+                  />
+                  <span className="text-sm">Rendimento Líquido</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Dividends & JCP Monthly Chart */}
+          {/* Monthly Evolution Area Chart */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Evolução da Carteira (Últimos 12 meses)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={chartConfigEvolution}
+                className="h-[300px] w-full"
+              >
+                <AreaChart
+                  data={monthlyEvolution}
+                  margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="grossGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop
+                        offset="5%"
+                        stopColor="hsl(var(--chart-1))"
+                        stopOpacity={0.3}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor="hsl(var(--chart-1))"
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                    <linearGradient id="netGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop
+                        offset="5%"
+                        stopColor="hsl(var(--chart-2))"
+                        stopOpacity={0.3}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor="hsl(var(--chart-2))"
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    className="stroke-muted"
+                  />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                  <YAxis
+                    tickFormatter={v => formatCurrency(v)}
+                    width={100}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value, name) => {
+                          const label =
+                            name === 'grossValue' ? 'Bruto' : 'Líquido';
+                          return [formatCurrency(value as number), label];
+                        }}
+                      />
+                    }
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="grossValue"
+                    stroke="hsl(var(--chart-1))"
+                    fillOpacity={1}
+                    fill="url(#grossGrad)"
+                    strokeWidth={2}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="netValue"
+                    stroke="hsl(var(--chart-2))"
+                    fillOpacity={1}
+                    fill="url(#netGrad)"
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ChartContainer>
+              <div className="flex justify-center gap-6 mt-4">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: 'hsl(var(--chart-1))' }}
+                  />
+                  <span className="text-sm">Valor Bruto</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: 'hsl(var(--chart-2))' }}
+                  />
+                  <span className="text-sm">Valor Líquido</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="pt-6 text-center text-muted-foreground">
+            Adicione investimentos para visualizar os gráficos de carteira.
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Gráfico de proventos – sempre renderizado no final */}
       <DividendsChart />
     </div>
   );
