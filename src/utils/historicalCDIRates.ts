@@ -93,7 +93,8 @@ export const HISTORICAL_CDI_PERIODS: CDIPeriod[] = [
   { startDate: '2025-06-20', endDate: '2026-03-17', annualRate: 15.00 },
   { startDate: '2026-03-18', endDate: '2026-04-28', annualRate: 14.75 },
   { startDate: '2026-04-29', endDate: '2026-08-05', annualRate: 14.50 },
-  { startDate: '2026-08-06', endDate: '2099-12-31', annualRate: 14.00 },
+  { startDate: '2026-08-06', endDate: '2026-09-15', annualRate: 14.00 },
+  { startDate: '2026-09-16', endDate: '2099-09-15', annualRate: 13.75 },
 ];
 
 /**

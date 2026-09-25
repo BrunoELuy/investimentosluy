@@ -1,7 +1,11 @@
-import { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { useInvestment, useUpdateInvestment, useDeleteInvestment } from '@/hooks/useInvestments';
+import {
+  useDeleteInvestment,
+  useInvestment,
+  useUpdateInvestment,
+} from '@/hooks/useInvestments';
 import { useEconomicRates } from '@/hooks/useEconomicRates';
 import { useDeposits } from '@/hooks/useDeposits';
 import { InvestmentDetails } from '@/components/investments/InvestmentDetails';
@@ -42,12 +46,12 @@ export default function InvestmentDetail() {
   const handleDelete = async () => {
     if (!id) return;
     await deleteMutation.mutateAsync(id);
-    navigate('/');
+    navigate('/investments');
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -55,35 +59,33 @@ export default function InvestmentDetail() {
 
   if (!calculation) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center py-12">
         <p className="text-muted-foreground">Investimento não encontrado</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
-        <InvestmentDetails
-          calculation={calculation}
-          onBack={() => navigate('/')}
-          onEdit={() => setIsEditing(true)}
-          onDelete={handleDelete}
-        />
+    <>
+      <InvestmentDetails
+        calculation={calculation}
+        onBack={() => navigate('/investments')}
+        onEdit={() => setIsEditing(true)}
+        onDelete={handleDelete}
+      />
 
-        <Dialog open={isEditing} onOpenChange={setIsEditing}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Editar Investimento</DialogTitle>
-            </DialogHeader>
-            <InvestmentForm
-              investment={calculation.investment}
-              onSubmit={handleUpdate}
-              onCancel={() => setIsEditing(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      </div>
-    </div>
+      <Dialog open={isEditing} onOpenChange={setIsEditing}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Investimento</DialogTitle>
+          </DialogHeader>
+          <InvestmentForm
+            investment={calculation.investment}
+            onSubmit={handleUpdate}
+            onCancel={() => setIsEditing(false)}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
