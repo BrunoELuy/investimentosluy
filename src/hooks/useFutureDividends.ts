@@ -3,6 +3,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { useInvestments } from '@/hooks/useInvestments';
 import { supabase } from '@/integrations/supabase/client';
 
+/**
+ * Versão do queryKey. Mude isso sempre que trocar a fonte de dados
+ * (ex.: Yahoo → Status Invest) para invalidar cache antigo do React Query.
+ */
+const QUERY_VERSION = 'v2-status-invest';
+
 export interface FutureDividend {
   id: string;
   ticker: string;
@@ -56,9 +62,15 @@ export function useFutureDividends() {
   ).sort();
 
   return useQuery({
-    queryKey: ['future-dividends', user?.id, tickers.join(',')],
+    queryKey: ['future-dividends', QUERY_VERSION, user?.id, tickers.join(',')],
     queryFn: async (): Promise<FutureDividend[]> => {
-      if (!user || tickers.length === 0) return [];
+      if (!user || tickers.length === 0) {
+        console.log('[useFutureDividends] Sem user ou sem tickers');
+        return [];
+      }
+
+      console.group('[useFutureDividends] Buscando futuros proventos');
+      console.log('Tickers:', tickers);
 
       // 1. Chama Edge Function que agrega proventos futuros (Status Invest)
       const { data: fnData, error: fnError } = await supabase.functions.invoke(
@@ -68,13 +80,15 @@ export function useFutureDividends() {
 
       if (fnError) {
         console.error('[useFutureDividends] Edge function error:', fnError);
+        console.groupEnd();
         throw new Error(fnError.message);
       }
 
       const dividendsByTicker: Record<string, DividendEvent[]> =
         fnData?.dividends ?? {};
 
-      console.log('[useFutureDividends] Retorno da edge:', dividendsByTicker);
+      console.log('Retorno da edge function:', dividendsByTicker);
+      console.log('Erros da Brapi/StatusInvest:', fnData?.errors);
 
       // 2. Busca todas as transações do usuário de uma vez
       const { data: txData, error: txError } = await supabase
@@ -84,10 +98,12 @@ export function useFutureDividends() {
 
       if (txError) {
         console.error('[useFutureDividends] Erro ao buscar transações:', txError);
+        console.groupEnd();
         throw new Error(txError.message);
       }
 
       const transactions = (txData ?? []) as (StockTransactionLite & { ticker: string })[];
+      console.log(`Total de transações em stock_transactions: ${transactions.length}`);
 
       // Agrupa por ticker para cálculo em memória
       const txByTicker = new Map<string, StockTransactionLite[]>();
@@ -102,6 +118,10 @@ export function useFutureDividends() {
 
       for (const [ticker, dividends] of Object.entries(dividendsByTicker)) {
         const txs = txByTicker.get(ticker) ?? [];
+
+        console.log(
+          `${ticker}: ${dividends.length} eventos futuros | ${txs.length} transações registradas`
+        );
 
         for (const d of dividends) {
           // Como o Status Invest fornece data ex e data de pagamento reais,
@@ -140,9 +160,13 @@ export function useFutureDividends() {
         }
       }
 
+      console.log(`Total de dividendos futuros processados: ${result.length}`);
+      console.log('Lista final:', result);
+      console.groupEnd();
+
       return result.sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
     },
     enabled: !!user && tickers.length > 0,
-    staleTime: 1000 * 60 * 60 * 6,
+    staleTime: 1000 * 60 * 30, // 30 minutos (testes)
   });
 }
