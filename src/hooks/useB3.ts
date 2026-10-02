@@ -333,8 +333,15 @@ export function useImportB3Movements() {
         }
 
         // 3.1 Persiste transações individuais (para cálculo na Data Com)
+        // Normaliza acentos: "Liquidação" → "liquidacao"
+        const normalizeText = (s: string) =>
+          (s ?? '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase();
+
         const tickerMovements = stock.movements.filter(m => {
-          const norm = m.movementType.toLowerCase();
+          const norm = normalizeText(m.movementType);
           return (
             norm.includes('liquidacao') ||
             norm.includes('compra') ||
@@ -342,9 +349,13 @@ export function useImportB3Movements() {
           );
         });
 
+        console.log(
+          `[useImportB3Movements] ${stock.ticker}: ${stock.movements.length} movimentos no total, ${tickerMovements.length} elegíveis para transação`
+        );
+
         for (const m of tickerMovements) {
-          const norm = m.movementType.toLowerCase();
-          const entryExit = (m.entryExit || 'Credito').toLowerCase();
+          const norm = normalizeText(m.movementType);
+          const entryExit = normalizeText(m.entryExit ?? 'Credito');
           const isSale =
             entryExit === 'debito' &&
             (norm.includes('liquidacao') || norm.includes('venda'));
