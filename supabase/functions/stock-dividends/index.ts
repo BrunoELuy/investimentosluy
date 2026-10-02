@@ -4,64 +4,45 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-interface YahooDividendEvent {
-  amount: number;
-  date: number; // Unix timestamp em segundos
+interface StatusInvestProventsResponse {
+  provents?: Array<{
+    ed?: string;  // data ex (dd/mm/yyyy)
+    pd?: string;  // data de pagamento (dd/mm/yyyy)
+    v?: number;   // valor por ação
+    t?: string;   // tipo (DIVIDENDO, JCP, etc.)
+    et?: string;  // label
+  }>;
 }
 
-interface YahooChartResponse {
-  chart: {
-    result?: Array<{
-      meta?: { symbol?: string; shortName?: string; longName?: string };
-      events?: { dividends?: Record<string, YahooDividendEvent> };
-    }>;
-    error?: { code: string; description: string } | null;
-  };
+/** Converte dd/MM/yyyy para YYYY-MM-DD */
+function brDateToISO(br?: string): string | null {
+  if (!br) return null;
+  const m = br.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  return `${m[3]}-${m[2]}-${m[1]}`;
 }
 
-/** Converte timestamp Unix (segundos) para YYYY-MM-DD */
-function timestampToDate(ts: number): string {
-  return new Date(ts * 1000).toISOString().split('T')[0];
-}
-
-/** Busca dividendos futuros de um único ticker no Yahoo Finance */
-async function fetchYahooDividends(
-  ticker: string
-): Promise<Array<{
-  assetIssued: string;
-  paymentDate: string;
-  rate: number;
-  relatedTo: string;
-  lastDatePrior: string;
-  approvedOn: string;
-}>> {
-  const symbol = `${ticker.toUpperCase()}.SA`;
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-    symbol
-  )}?interval=1d&range=1y&events=div`;
+async function fetchStatusInvestDividends(ticker: string) {
+  const url = `https://statusinvest.com.br/acao/companytickerprovents?ticker=${encodeURIComponent(
+    ticker.toUpperCase()
+  )}&chartProventsType=2`;
 
   const res = await fetch(url, {
     headers: {
       'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-      Accept: 'application/json',
+      Accept: 'application/json, text/plain, */*',
+      'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+      Referer: `https://statusinvest.com.br/acoes/${ticker.toLowerCase()}`,
     },
   });
 
   if (!res.ok) {
-    throw new Error(`Yahoo retornou HTTP ${res.status}`);
+    throw new Error(`StatusInvest retornou HTTP ${res.status}`);
   }
 
-  const json: YahooChartResponse = await res.json();
-
-  if (json.chart.error) {
-    throw new Error(json.chart.error.description ?? 'Erro desconhecido no Yahoo');
-  }
-
-  const result = json.chart.result?.[0];
-  if (!result) return [];
-
-  const divs = result.events?.dividends ?? {};
+  const json: StatusInvestProventsResponse = await res.json();
+  const raw = json.provents ?? [];
   const today = new Date().toISOString().split('T')[0];
 
   const future: Array<{
@@ -73,19 +54,20 @@ async function fetchYahooDividends(
     approvedOn: string;
   }> = [];
 
-  for (const ev of Object.values(divs)) {
-    if (!ev.date || ev.amount == null) continue;
-    const dateStr = timestampToDate(ev.date);
-    // Apenas eventos futuros (data do evento > hoje)
-    if (dateStr <= today) continue;
+  for (const p of raw) {
+    const pd = brDateToISO(p.pd);
+    const ed = brDateToISO(p.ed) ?? pd;
+    if (!pd || !ed) continue;
+    if (pd <= today) continue;   // só futuros
+    if (p.v == null || p.v <= 0) continue;
 
     future.push({
-      assetIssued: result.meta?.shortName ?? ticker,
-      paymentDate: dateStr,
-      rate: ev.amount,
-      relatedTo: 'DIVIDENDO', // Yahoo não diferencia JCP; tratamos como dividendo
-      lastDatePrior: dateStr, // usamos a própria data como fallback
-      approvedOn: dateStr,
+      assetIssued: ticker,
+      paymentDate: pd,
+      rate: p.v,
+      relatedTo: (p.t ?? 'DIVIDENDO').toUpperCase(),
+      lastDatePrior: ed,
+      approvedOn: ed,
     });
   }
 
@@ -115,18 +97,16 @@ Deno.serve(async (req) => {
     const errors: Record<string, string> = {};
 
     for (const ticker of unique) {
-
       try {
-        const events = await fetchYahooDividends(ticker);
+        const events = await fetchStatusInvestDividends(ticker);
         dividends[ticker] = events;
-        console.log(`Yahoo ${ticker}: ${events.length} eventos futuros`);
+        console.log(`StatusInvest ${ticker}: ${events.length} eventos futuros`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Erro desconhecido';
-        console.error(`Yahoo error for ${ticker}: ${msg}`);
+        console.error(`StatusInvest error for ${ticker}: ${msg}`);
         errors[ticker] = msg;
       }
-      // Pequeno delay para evitar rate-limit do Yahoo
-      await new Promise((r) => setTimeout(r, 250));
+      await new Promise((r) => setTimeout(r, 300));
     }
 
     return new Response(JSON.stringify({ dividends, errors }), {
