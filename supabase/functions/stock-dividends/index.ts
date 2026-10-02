@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
 
     // Free Brapi plan: 1 ticker per request — fetch sequentially
     for (const ticker of unique) {
-      const url = `https://brapi.dev/api/quote/${encodeURIComponent(ticker)}?dividends=true&range=3morange=1y&interval=1dinterval=1d&token=${BRAPI_API_KEY}`;
+      const url = `https://brapi.dev/api/quote/${encodeURIComponent(ticker)}?dividends=true&range=3mo&interval=1d&token=${BRAPI_API_KEY}`;
       const response = await fetch(url);
       const data = await response.json().catch(() => null);
 
