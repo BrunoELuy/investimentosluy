@@ -4,14 +4,33 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-interface StatusInvestProventsResponse {
-  provents?: Array<{
-    ed?: string;  // data ex (dd/mm/yyyy)
-    pd?: string;  // data de pagamento (dd/mm/yyyy)
-    v?: number;   // valor por ação
-    t?: string;   // tipo (DIVIDENDO, JCP, etc.)
-    et?: string;  // label
-  }>;
+/**
+ * Formato real retornado por
+ * https://statusinvest.com.br/acao/companytickerprovents?ticker=XXX&chartProventsType=2
+ * (verificado em 2026-10-02): o array de eventos vem em `assetEarningsModels`.
+ *
+ * Campos de cada evento:
+ *   ed = data com / ex (última data para ter direito)  dd/MM/yyyy
+ *   pd = data de pagamento                             dd/MM/yyyy
+ *   et = tipo (Dividendo, JCP, ...)
+ *   v  = valor por ação
+ */
+interface StatusInvestEarning {
+  y?: number;
+  m?: number;
+  d?: number;
+  ed?: string;
+  pd?: string;
+  et?: string;
+  etd?: string;
+  v?: number | string;
+  sv?: string;
+  sov?: string;
+  adj?: boolean;
+}
+
+interface StatusInvestResponse {
+  assetEarningsModels?: StatusInvestEarning[];
 }
 
 /** Converte dd/MM/yyyy para YYYY-MM-DD */
@@ -20,6 +39,14 @@ function brDateToISO(br?: string): string | null {
   const m = br.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (!m) return null;
   return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+/** Aceita número ou string com vírgula decimal */
+function parseValue(raw?: number | string): number | null {
+  if (raw == null) return null;
+  if (typeof raw === 'number') return isFinite(raw) ? raw : null;
+  const n = Number(raw.replace(/\./g, '').replace(',', '.'));
+  return isFinite(n) ? n : null;
 }
 
 async function fetchStatusInvestDividends(ticker: string) {
@@ -41,13 +68,16 @@ async function fetchStatusInvestDividends(ticker: string) {
     throw new Error(`StatusInvest retornou HTTP ${res.status}`);
   }
 
-  const json: StatusInvestProventsResponse = await res.json();
-  const raw = json.provents ?? [];
-  const today = new Date().toISOString().split('T')[0];
+  const text = await res.text();
+  let json: StatusInvestResponse;
+  try {
+    json = JSON.parse(text) as StatusInvestResponse;
+  } catch {
+    throw new Error('StatusInvest retornou resposta não-JSON (bloqueio?)');
+  }
 
-  // DEBUG TEMPORÁRIO
-  console.log(`DEBUG ${ticker}: keys=${Object.keys(json).join(',')} rawLen=${raw.length}`);
-  console.log(`DEBUG ${ticker} sample=${JSON.stringify(raw.slice(0, 3)).slice(0, 600)}`);
+  const raw = json.assetEarningsModels ?? [];
+  const today = new Date().toISOString().split('T')[0];
 
   const future: Array<{
     assetIssued: string;
@@ -62,14 +92,15 @@ async function fetchStatusInvestDividends(ticker: string) {
     const pd = brDateToISO(p.pd);
     const ed = brDateToISO(p.ed) ?? pd;
     if (!pd || !ed) continue;
-    if (pd <= today) continue;   // só futuros
-    if (p.v == null || p.v <= 0) continue;
+    if (pd <= today) continue; // só futuros
+    const rate = parseValue(p.v);
+    if (rate == null || rate <= 0) continue;
 
     future.push({
       assetIssued: ticker,
       paymentDate: pd,
-      rate: p.v,
-      relatedTo: (p.t ?? 'DIVIDENDO').toUpperCase(),
+      rate,
+      relatedTo: (p.et ?? p.etd ?? 'DIVIDENDO').toUpperCase(),
       lastDatePrior: ed,
       approvedOn: ed,
     });
