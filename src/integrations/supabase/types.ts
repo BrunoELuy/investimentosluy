@@ -357,6 +357,45 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_transactions: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          operation: string
+          quantity: number
+          source: string | null
+          ticker: string
+          total_value: number | null
+          unit_price: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id: string
+          operation: string
+          quantity: number
+          source?: string | null
+          ticker: string
+          total_value?: number | null
+          unit_price?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          operation?: string
+          quantity?: number
+          source?: string | null
+          ticker?: string
+          total_value?: number | null
+          unit_price?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
