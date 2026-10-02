@@ -45,6 +45,10 @@ async function fetchStatusInvestDividends(ticker: string) {
   const raw = json.provents ?? [];
   const today = new Date().toISOString().split('T')[0];
 
+  // DEBUG TEMPORÁRIO
+  console.log(`DEBUG ${ticker}: keys=${Object.keys(json).join(',')} rawLen=${raw.length}`);
+  console.log(`DEBUG ${ticker} sample=${JSON.stringify(raw.slice(0, 3)).slice(0, 600)}`);
+
   const future: Array<{
     assetIssued: string;
     paymentDate: string;
