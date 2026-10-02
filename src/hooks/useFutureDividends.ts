@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
  * Versão do queryKey. Mude isso sempre que trocar a fonte de dados
  * (ex.: Yahoo → Status Invest) para invalidar cache antigo do React Query.
  */
-const QUERY_VERSION = 'v2-status-invest';
+const QUERY_VERSION = 'v3-no-cache';
 
 export interface FutureDividend {
   id: string;
@@ -22,11 +22,6 @@ export interface FutureDividend {
   totalAmount: number;
 }
 
-/**
- * Formato normalizado retornado pela Edge Function `stock-dividends`.
- * A Edge Function é responsável por buscar de fontes externas (Status Invest)
- * e devolver neste formato, independentemente da fonte original.
- */
 interface DividendEvent {
   assetIssued?: string;
   paymentDate?: string;
@@ -53,26 +48,38 @@ export function useFutureDividends() {
   const { user } = useAuth();
   const { data: investments = [] } = useInvestments();
 
+  const stocks = investments.filter((i) => i.type === 'ACAO' && i.ticker);
+
   const tickers = Array.from(
-    new Set(
-      investments
-        .filter((i) => i.type === 'ACAO' && i.ticker)
-        .map((i) => i.ticker!.toUpperCase())
-    )
+    new Set(stocks.map((i) => i.ticker!.toUpperCase()))
   ).sort();
 
+  /**
+   * Assinatura das posições atuais: ticker:quantidade.
+   * Se qualquer quantidade mudar, a queryKey muda e a query é refeita
+   * automaticamente, mesmo sem recarregar a página.
+   */
+  const positionsSignature = stocks
+    .map((i) => `${i.ticker!.toUpperCase()}:${i.quantity ?? 0}`)
+    .sort()
+    .join('|');
+
   return useQuery({
-    queryKey: ['future-dividends', QUERY_VERSION, user?.id, tickers.join(',')],
+    queryKey: [
+      'future-dividends',
+      QUERY_VERSION,
+      user?.id,
+      tickers.join(','),
+      positionsSignature,
+    ],
     queryFn: async (): Promise<FutureDividend[]> => {
-      if (!user || tickers.length === 0) {
-        console.log('[useFutureDividends] Sem user ou sem tickers');
-        return [];
-      }
+      if (!user || tickers.length === 0) return [];
 
       console.group('[useFutureDividends] Buscando futuros proventos');
       console.log('Tickers:', tickers);
+      console.log('Posições:', positionsSignature);
 
-      // 1. Chama Edge Function que agrega proventos futuros (Status Invest)
+      // 1. Chama Edge Function que agrega proventos futuros
       const { data: fnData, error: fnError } = await supabase.functions.invoke(
         'stock-dividends',
         { body: { tickers } }
@@ -87,10 +94,7 @@ export function useFutureDividends() {
       const dividendsByTicker: Record<string, DividendEvent[]> =
         fnData?.dividends ?? {};
 
-      console.log('Retorno da edge function:', dividendsByTicker);
-      console.log('Erros da Brapi/StatusInvest:', fnData?.errors);
-
-      // 2. Busca todas as transações do usuário de uma vez
+      // 2. Busca transações do usuário
       const { data: txData, error: txError } = await supabase
         .from('stock_transactions')
         .select('operation, quantity, date, ticker')
@@ -103,9 +107,7 @@ export function useFutureDividends() {
       }
 
       const transactions = (txData ?? []) as (StockTransactionLite & { ticker: string })[];
-      console.log(`Total de transações em stock_transactions: ${transactions.length}`);
 
-      // Agrupa por ticker para cálculo em memória
       const txByTicker = new Map<string, StockTransactionLite[]>();
       for (const tx of transactions) {
         const key = tx.ticker.toUpperCase();
@@ -113,19 +115,20 @@ export function useFutureDividends() {
         txByTicker.get(key)!.push(tx);
       }
 
-      // 3. Calcula quantidade na Data Com e monta a lista final
+      // Fallback: quantidade atual por ticker (usado se não houver transações)
+      const currentQtyByTicker = new Map<string, number>();
+      for (const s of stocks) {
+        currentQtyByTicker.set(s.ticker!.toUpperCase(), s.quantity ?? 0);
+      }
+
+      // 3. Calcula quantidade na Data Com
       const result: FutureDividend[] = [];
 
       for (const [ticker, dividends] of Object.entries(dividendsByTicker)) {
         const txs = txByTicker.get(ticker) ?? [];
-
-        console.log(
-          `${ticker}: ${dividends.length} eventos futuros | ${txs.length} transações registradas`
-        );
+        const currentQty = currentQtyByTicker.get(ticker) ?? 0;
 
         for (const d of dividends) {
-          // Como o Status Invest fornece data ex e data de pagamento reais,
-          // exigimos ambos os campos. approvedOn fica como fallback defensivo.
           if (!d.paymentDate || d.rate == null) continue;
           if (!d.lastDatePrior && !d.approvedOn) continue;
 
@@ -133,7 +136,7 @@ export function useFutureDividends() {
           const paymentDate = d.paymentDate.split('T')[0];
           const { type, label } = mapRelatedTo(d.relatedTo);
 
-          // Soma tudo até a Data Com (inclusive)
+          // Soma tudo até a Data Com
           let qty = 0;
           for (const tx of txs) {
             if (tx.date > dateCom) continue;
@@ -142,7 +145,11 @@ export function useFutureDividends() {
           }
           qty = Math.max(0, qty);
 
-          // Ignora posições que não tinham o ativo na Data Com
+          // Fallback: se não há transações, usa a posição atual
+          if (qty <= 0 && txs.length === 0 && currentQty > 0) {
+            qty = currentQty;
+          }
+
           if (qty <= 0) continue;
 
           result.push({
@@ -161,12 +168,16 @@ export function useFutureDividends() {
       }
 
       console.log(`Total de dividendos futuros processados: ${result.length}`);
-      console.log('Lista final:', result);
       console.groupEnd();
 
       return result.sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
     },
     enabled: !!user && tickers.length > 0,
-    staleTime: 1000 * 60 * 30, // 30 minutos (testes)
+    // Sempre busca fresco ao montar/focar
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    // Descarta o cache assim que o componente desmontar
+    gcTime: 0,
   });
 }
