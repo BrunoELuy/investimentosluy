@@ -31,6 +31,21 @@ export interface B3Import {
   summary: unknown;
 }
 
+// ============ Tipos auxiliares ============
+
+interface StockTransactionRow {
+  id: string;
+  user_id: string;
+  ticker: string;
+  date: string; // YYYY-MM-DD
+  operation: 'BUY' | 'SELL';
+  quantity: number;
+  unit_price: number | null;
+  total_value: number | null;
+  source: string;
+  created_at: string;
+}
+
 // ============ Mapeamento DB <-> DividendPayment ============
 
 interface DividendRow {
@@ -152,6 +167,35 @@ export function useDividendPayments() {
   });
 }
 
+/**
+ * Lista todas as transações de ações do usuário (compras e vendas).
+ * Útil para calcular quantidade na Data Com de proventos futuros.
+ */
+export function useStockTransactions(ticker?: string) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['stock-transactions', user?.id, ticker ?? 'all'],
+    queryFn: async (): Promise<StockTransactionRow[]> => {
+      if (!user) return [];
+      let query = supabase
+        .from('stock_transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: true });
+
+      if (ticker) {
+        query = query.eq('ticker', ticker.toUpperCase());
+      }
+
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
+      return (data ?? []) as StockTransactionRow[];
+    },
+    enabled: !!user,
+  });
+}
+
 // ============ Hooks de escrita ============
 
 export function useRegisterB3Import() {
@@ -185,7 +229,7 @@ export function useRegisterB3Import() {
 
 /**
  * Importa o extrato de movimentações B3:
- * - Ações ativas: cria/atualiza posições.
+ * - Ações ativas: cria/atualiza posições + persiste transações individuais.
  * - Renda fixa ativa: cria/atualiza posições + aportes.
  * - Posições zeradas: não criadas.
  * - Proventos: salvos localmente E no Supabase (cross-device).
@@ -235,6 +279,7 @@ export function useImportB3Movements() {
 
       let createdCount = 0;
       let updatedCount = 0;
+      const allStockTransactionRows: StockTransactionRow[] = [];
 
       // 3. Ações ativas
       const activeStocks = stocks.filter(s => !s.isZeroBalance && s.totalQuantity > 0);
@@ -285,6 +330,60 @@ export function useImportB3Movements() {
           }
           await saveLocalInvestment(newStock);
           createdCount++;
+        }
+
+        // 3.1 Persiste transações individuais (para cálculo na Data Com)
+        const tickerMovements = stock.movements.filter(m => {
+          const norm = m.movementType.toLowerCase();
+          return (
+            norm.includes('liquidacao') ||
+            norm.includes('compra') ||
+            norm.includes('venda')
+          );
+        });
+
+        for (const m of tickerMovements) {
+          const norm = m.movementType.toLowerCase();
+          const entryExit = (m.entryExit || 'Credito').toLowerCase();
+          const isSale =
+            entryExit === 'debito' &&
+            (norm.includes('liquidacao') || norm.includes('venda'));
+          const isBuy =
+            entryExit === 'credito' &&
+            (norm.includes('liquidacao') || norm.includes('compra'));
+
+          if (!isBuy && !isSale) continue;
+          if (!m.quantity || m.quantity <= 0) continue;
+
+          allStockTransactionRows.push({
+            id: `${user.id}-${stock.ticker}-${m.date}-${isBuy ? 'B' : 'S'}-${m.quantity}-${m.unitPrice ?? 0}`,
+            user_id: user.id,
+            ticker: stock.ticker.toUpperCase(),
+            date: m.date,
+            operation: isBuy ? 'BUY' : 'SELL',
+            quantity: m.quantity,
+            unit_price: m.unitPrice ?? null,
+            total_value: m.operationValue ?? null,
+            source: 'B3_IMPORT',
+            created_at: now,
+          });
+        }
+      }
+
+      // 3.2 Envia todas as transações de uma só vez ao Supabase
+      if (isOnline() && allStockTransactionRows.length > 0) {
+        try {
+          const { error } = await supabase
+            .from('stock_transactions')
+            .upsert(allStockTransactionRows, { onConflict: 'user_id,id' });
+          if (error) {
+            console.warn(
+              '[useImportB3Movements] Erro ao salvar transações de ações:',
+              error.message
+            );
+          }
+        } catch (err) {
+          console.warn('[useImportB3Movements] Falha ao sincronizar transações:', err);
         }
       }
 
@@ -395,6 +494,7 @@ export function useImportB3Movements() {
               updatedCount,
               dividendsCount: dividends.length,
               totalDividends: dividends.reduce((s, d) => s + d.totalAmount, 0),
+              stockTransactionsCount: allStockTransactionRows.length,
             } as never,
           });
         } catch {
@@ -402,16 +502,22 @@ export function useImportB3Movements() {
         }
       }
 
-      return { createdCount, updatedCount, dividendsCount: dividends.length };
+      return {
+        createdCount,
+        updatedCount,
+        dividendsCount: dividends.length,
+        stockTransactionsCount: allStockTransactionRows.length,
+      };
     },
     onSuccess: data => {
       queryClient.invalidateQueries({ queryKey: ['investments'] });
       queryClient.invalidateQueries({ queryKey: ['all-deposits'] });
       queryClient.invalidateQueries({ queryKey: ['dividend-payments'] });
       queryClient.invalidateQueries({ queryKey: ['b3-imports'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
       toast({
         title: 'Importação concluída com sucesso!',
-        description: `${data.createdCount} novos investimentos, ${data.updatedCount} atualizados, ${data.dividendsCount} proventos registrados.`,
+        description: `${data.createdCount} novos investimentos, ${data.updatedCount} atualizados, ${data.dividendsCount} proventos e ${data.stockTransactionsCount} transações de ações registradas.`,
       });
     },
     onError: (error: Error) => {
@@ -446,7 +552,9 @@ export function useCreateFromB3() {
       const today = new Date().toISOString().split('T')[0];
       const isStock = !!position.ticker && !position.maturityDate;
       const type: InvestmentType = isStock ? 'ACAO' : 'CDB';
-      const rate = isStock ? { rate_type: 'NONE' as RateType, rate_value: 0 } : inferRate(position.indexer);
+      const rate = isStock
+        ? { rate_type: 'NONE' as RateType, rate_value: 0 }
+        : inferRate(position.indexer);
 
       const payload = {
         user_id: user.id,
