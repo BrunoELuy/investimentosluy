@@ -18,6 +18,7 @@ import {
 import type { InvestmentCalculation } from '@/types/investment';
 import { formatCurrency, calculateGrossReturn } from '@/utils/investmentCalculations';
 import { DividendsChart } from './DividendsChart';
+import { FutureDividendsChart } from './FutureDividendsChart';
 
 interface PortfolioChartsProps {
   calculations: InvestmentCalculation[];
@@ -473,6 +474,9 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
 
       {/* Gráfico de proventos – sempre renderizado no final */}
       <DividendsChart />
+
+      {/* Gráfico de proventos futuros */}
+      <FutureDividendsChart />
     </div>
   );
 }
