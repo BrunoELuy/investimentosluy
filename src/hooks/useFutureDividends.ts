@@ -49,7 +49,10 @@ export function mapRelatedTo(raw?: string): { type: FutureDividend['type']; labe
   const v = (raw ?? '').toUpperCase();
   if (v.includes('JCP') || v.includes('JUROS')) return { type: 'JCP', label: 'JCP' };
   if (v.includes('DIVIDEND')) return { type: 'DIVIDENDO', label: 'Dividendo' };
-  return { type: 'OUTRO', label: raw ?? 'Provento' };
+
+  // Normaliza '' / '   ' / undefined → 'Provento', preservando rótulos customizados
+  const trimmed = (raw ?? '').trim();
+  return { type: 'OUTRO', label: trimmed || 'Provento' };
 }
 
 // ← NOVO: helper puro extraído do queryFn
