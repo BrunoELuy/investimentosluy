@@ -176,12 +176,13 @@ describe('reconcileDueDividends', () => {
 
     const [rows, options] = upsertMock.mock.calls[0];
     expect(rows).toHaveLength(1);
+    // Contra o schema real (types.ts → dividend_payments.Row), a coluna é `date`.
     expect(rows[0]).toMatchObject({
       id: 'fd-TIMS3-2026-11-10-0.5-DIVIDENDO',
       user_id: 'user-1',
       ticker: 'TIMS3',
       type: 'DIVIDENDO',
-      payment_date: '2026-11-10', // ← atenção: coluna `date` no schema, mas row usa `date`
+      date: '2026-11-10',
       source: 'auto',
       total_amount: 120,
     });
@@ -190,6 +191,13 @@ describe('reconcileDueDividends', () => {
       onConflict: 'user_id,id',
       ignoreDuplicates: true,
     });
+  });
+
+  it('payload NÃO inclui payment_date (regressão)', async () => {
+    await reconcileDueDividends('user-1', [makeDividend()]);
+    const [rows] = upsertMock.mock.calls[0];
+    expect(rows[0]).not.toHaveProperty('payment_date');
+    expect(rows[0]).toHaveProperty('date', '2026-11-10');
   });
 
   it('é idempotente: chamar 2x gera 2 upserts mas o id é o mesmo', async () => {
