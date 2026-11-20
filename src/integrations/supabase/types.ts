@@ -58,6 +58,7 @@ export type Database = {
           id: string
           institution: string | null
           quantity: number | null
+          source: string
           ticker: string
           total_amount: number
           type: string
@@ -72,6 +73,7 @@ export type Database = {
           id: string
           institution?: string | null
           quantity?: number | null
+          source?: string
           ticker: string
           total_amount: number
           type: string
@@ -86,6 +88,7 @@ export type Database = {
           id?: string
           institution?: string | null
           quantity?: number | null
+          source?: string
           ticker?: string
           total_amount?: number
           type?: string

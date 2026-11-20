@@ -15,6 +15,13 @@
       "when": 1790901214097,
       "tag": "0001_create_stock_transactions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795135521831,
+      "tag": "0002_add_dividend_payments_source",
+      "breakpoints": true
     }
   ]
 }
