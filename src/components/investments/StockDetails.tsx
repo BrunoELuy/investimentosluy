@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { 
-  ArrowLeft, 
-  Edit, 
-  Trash2, 
+import {
+  ArrowLeft,
+  Edit,
+  Trash2,
   TrendingUp,
   TrendingDown,
   Calendar,
@@ -12,7 +12,7 @@ import {
   Hash,
   DollarSign,
   Coins,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +32,9 @@ import {
 import type { InvestmentCalculation } from '@/types/investment';
 import { formatCurrency } from '@/utils/investmentCalculations';
 import { useStockQuotes } from '@/hooks/useStockQuotes';
+// ← Feature 4
+import { StockAporteForm } from '@/components/investments/StockAporteForm';
+import { StockAportesList } from '@/components/investments/StockAportesList';
 
 interface StockDetailsProps {
   calculation: InvestmentCalculation;
@@ -43,7 +46,7 @@ interface StockDetailsProps {
 export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDetailsProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const { investment } = calculation;
-  
+
   const tickers = investment.ticker ? [investment.ticker] : [];
   const { quotes, isLoading: quotesLoading, lastUpdated, refetch } = useStockQuotes(tickers);
   const quote = investment.ticker ? quotes[investment.ticker] : undefined;
@@ -57,18 +60,18 @@ export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDet
     }
   };
 
-  const averagePrice = investment.quantity 
-    ? investment.initial_value / investment.quantity 
+  const averagePrice = investment.quantity
+    ? investment.initial_value / investment.quantity
     : 0;
 
-  const currentMarketValue = quote && investment.quantity 
-    ? quote.price * investment.quantity 
+  const currentMarketValue = quote && investment.quantity
+    ? quote.price * investment.quantity
     : null;
-  
-  const totalGainLoss = currentMarketValue !== null 
-    ? currentMarketValue - investment.initial_value 
+
+  const totalGainLoss = currentMarketValue !== null
+    ? currentMarketValue - investment.initial_value
     : null;
-  
+
   const totalGainLossPercent = totalGainLoss !== null && investment.initial_value > 0
     ? (totalGainLoss / investment.initial_value) * 100
     : null;
@@ -155,10 +158,10 @@ export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDet
               <CardTitle className="text-lg flex items-center gap-2">
                 📈 Cotação em Tempo Real
               </CardTitle>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={refetch} 
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refetch}
                 disabled={quotesLoading}
                 className="gap-2"
               >
@@ -253,7 +256,7 @@ export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDet
             <p className="text-xs text-muted-foreground">papéis</p>
           </CardContent>
         </Card>
-        
+
         <Card className="border-[hsl(280,70%,50%)]/20 bg-[hsl(280,70%,50%)]/5">
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
@@ -266,7 +269,7 @@ export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDet
             <p className="text-xs text-muted-foreground">por ação</p>
           </CardContent>
         </Card>
-        
+
         <Card className="border-[hsl(280,70%,50%)]/20 bg-[hsl(280,70%,50%)]/5 col-span-2 md:col-span-1">
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
@@ -279,6 +282,20 @@ export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDet
           </CardContent>
         </Card>
       </div>
+
+      {/* ← Feature 4: Aportes */}
+      {investment.ticker && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Aportes</h3>
+            <StockAporteForm
+              ticker={investment.ticker}
+              institution={investment.institution}
+            />
+          </div>
+          <StockAportesList ticker={investment.ticker} />
+        </div>
+      )}
 
       {/* Stock Info Card */}
       <Card className="border-[hsl(280,70%,50%)]/30 bg-[hsl(280,70%,50%)]/5">
