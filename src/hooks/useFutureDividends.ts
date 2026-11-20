@@ -6,7 +6,7 @@ import { saveLocalDividends, isOnline } from '@/lib/offlineDb';
 
 const QUERY_VERSION = 'v5-reconcile-due';
 
-// ← MUDOU: aceita `now` como parâmetro (default = new Date()) para testes
+// aceita `now` como parâmetro (default = new Date()) para testes
 export function todayInBrazil(now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Sao_Paulo',
@@ -44,7 +44,6 @@ interface StockTransactionLite {
   date: string;
 }
 
-// ← NOVO: `export` (era função interna)
 export function mapRelatedTo(raw?: string): { type: FutureDividend['type']; label: string } {
   const v = (raw ?? '').toUpperCase();
   if (v.includes('JCP') || v.includes('JUROS')) return { type: 'JCP', label: 'JCP' };
@@ -55,7 +54,21 @@ export function mapRelatedTo(raw?: string): { type: FutureDividend['type']; labe
   return { type: 'OUTRO', label: trimmed || 'Provento' };
 }
 
-// ← NOVO: helper puro extraído do queryFn
+// ← Feature 4: núcleo do cálculo (aporte antes/depois da Data-com)
+export function calculateQuantityAtDate(
+  transactions: Array<{ date: string; operation: 'BUY' | 'SELL'; quantity: number }>,
+  dateCom: string,
+): number {
+  let qty = 0;
+  for (const tx of transactions) {
+    if (tx.date > dateCom) continue;           // aportes depois da Data-com: ignorados
+    if (tx.operation === 'BUY') qty += Number(tx.quantity) || 0;
+    if (tx.operation === 'SELL') qty -= Number(tx.quantity) || 0;
+  }
+  return qty; // pode ser negativo; o caller aplica Math.max(0, ...)
+}
+
+// helper puro extraído do queryFn
 export function splitDueAndFuture<T extends { paymentDate: string }>(
   events: T[],
   today: string,
@@ -69,7 +82,6 @@ export function splitDueAndFuture<T extends { paymentDate: string }>(
   return { future, due };
 }
 
-// ← NOVO: `export` (era função interna) para permitir testes
 export async function reconcileDueDividends(
   userId: string,
   due: FutureDividend[],
@@ -209,12 +221,8 @@ export function useFutureDividends() {
           const paymentDate = d.paymentDate.split('T')[0];
           const { type, label } = mapRelatedTo(d.relatedTo);
 
-          let qty = 0;
-          for (const tx of txs) {
-            if (tx.date > dateCom) continue;
-            if (tx.operation === 'BUY') qty += Number(tx.quantity) || 0;
-            if (tx.operation === 'SELL') qty -= Number(tx.quantity) || 0;
-          }
+          // ← Feature 4: usa o helper puro (mesma semântica de antes)
+          let qty = calculateQuantityAtDate(txs, dateCom);
           qty = Math.max(0, qty);
 
           if (qty <= 0 && txs.length === 0 && currentQty > 0) {
@@ -239,7 +247,6 @@ export function useFutureDividends() {
       }
 
       const today = todayInBrazil();
-      // ← MUDOU: usa o helper puro (mesmo comportamento)
       const { future, due } = splitDueAndFuture(all, today);
 
       console.log(
