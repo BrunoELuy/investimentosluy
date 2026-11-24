@@ -272,7 +272,7 @@ export function useFutureDividends() {
       );
     },
     enabled: !!user && tickers.length > 0,
-    staleTime: 0,
+    staleTime: 12 * 60 * 60 * 1000,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     gcTime: 0,

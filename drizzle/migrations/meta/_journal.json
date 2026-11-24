@@ -22,6 +22,13 @@
       "when": 1795135521831,
       "tag": "0002_add_dividend_payments_source",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795536618898,
+      "tag": "0003_create_market_cache",
+      "breakpoints": true
     }
   ]
 }
