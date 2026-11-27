@@ -326,6 +326,51 @@ export function FutureDividendsChart() {
             </table>
           </div>
         )}
+
+        {/* Feature 7 — eventos individuais com data de pagamento */}
+        {yearDividends.length > 0 && (
+          <div className="border rounded-lg overflow-x-auto">
+            <p className="text-xs font-semibold text-muted-foreground px-3 pt-3 pb-1">
+              Calendário de pagamentos — {selectedYear}
+            </p>
+            <table className="w-full text-xs sm:text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50 text-muted-foreground text-left">
+                  <th className="p-2.5">Pagamento</th>
+                  <th className="p-2.5">Ativo</th>
+                  <th className="p-2.5">Tipo</th>
+                  <th className="p-2.5 text-right">R$/ação</th>
+                  <th className="p-2.5 text-right font-semibold">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...yearDividends]
+                  .sort((a, b) => a.paymentDate.localeCompare(b.paymentDate))
+                  .map(d => {
+                    const color = getTickerColor(allTickers, d.ticker);
+                    const [year, month, day] = d.paymentDate.split('-');
+                    const dateLabel = `${day}/${month}/${year}`;
+                    return (
+                      <tr key={d.id} className="border-b last:border-0 hover:bg-muted/20">
+                        <td className="p-2.5 font-mono text-xs whitespace-nowrap">{dateLabel}</td>
+                        <td className="p-2.5">
+                          <span className="font-semibold text-xs px-2 py-0.5 rounded-full text-white"
+                            style={{ backgroundColor: color }}>
+                            {d.ticker}
+                          </span>
+                        </td>
+                        <td className="p-2.5 text-muted-foreground">{d.typeLabel}</td>
+                        <td className="p-2.5 text-right font-mono text-xs">{formatCurrency(d.valuePerShare)}</td>
+                        <td className="p-2.5 text-right font-bold font-mono text-emerald-700 dark:text-emerald-400">
+                          {formatCurrency(d.totalAmount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
