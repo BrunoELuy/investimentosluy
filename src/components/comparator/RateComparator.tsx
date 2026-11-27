@@ -23,15 +23,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useEconomicRates } from '@/hooks/useEconomicRates';
-import { calculateGrossReturn, getIRRate, formatCurrency, formatPercent } from '@/utils/investmentCalculations';
+import { calculateGrossReturn, getIRRate, formatCurrency, formatPercent, isTaxableFixedIncome } from '@/utils/investmentCalculations';
 
 interface InvestmentOption {
   id: string;
   name: string;
-  type: 'CDB' | 'LCA';
-  rateType: 'CDI' | 'IPCA' | 'PREFIXADO';
+  type: 'CDB' | 'LCA' | 'TESOURO';
+  rateType: 'CDI' | 'SELIC' | 'IPCA' | 'PREFIXADO';
   rateValue: number;
 }
+
+const COMPARE_YEARS = [2029, 2031, 2034, 2035, 2040];
 
 interface ComparisonResult {
   option: InvestmentOption;
@@ -48,10 +50,13 @@ interface ComparisonResult {
 export function RateComparator() {
   const { data: rates } = useEconomicRates();
   const cdiRate = rates?.cdi ?? 10.65;
+  const selicRate = rates?.selic ?? 10.5;
   const ipcaRate = rates?.ipca ?? 4.5;
   
   const [initialValue, setInitialValue] = useState<number>(10000);
+  const [periodMode, setPeriodMode] = useState<'months' | 'year'>('months');
   const [periodMonths, setPeriodMonths] = useState<number>(12);
+  const [targetYear, setTargetYear] = useState<number>(2034);
   const [options, setOptions] = useState<InvestmentOption[]>([]);
 
   const [newOption, setNewOption] = useState<Omit<InvestmentOption, 'id'>>({
@@ -74,8 +79,17 @@ export function RateComparator() {
     setOptions(options.filter(o => o.id !== id));
   };
 
+  const effectiveDays = useMemo(() => {
+    const now = new Date();
+    if (periodMode === 'year') {
+      const end = new Date(targetYear, 0, 1);
+      return Math.max(differenceInDays(end, now), 1);
+    }
+    return differenceInDays(addMonths(now, periodMonths), now);
+  }, [periodMode, periodMonths, targetYear]);
+
   const comparison = useMemo((): ComparisonResult[] => {
-    const days = differenceInDays(addMonths(new Date(), periodMonths), new Date());
+    const days = effectiveDays;
     
     const results = options.map(option => {
       const grossReturn = calculateGrossReturn(
@@ -84,21 +98,24 @@ export function RateComparator() {
         option.rateValue,
         days,
         cdiRate,
-        ipcaRate
+        ipcaRate,
+        undefined,
+        undefined,
+        selicRate
       );
 
-      const grossReturnPercent = (grossReturn / initialValue) * 100;
+      const grossReturnPercent = initialValue > 0 ? (grossReturn / initialValue) * 100 : 0;
 
       let irRate = 0;
       let irAmount = 0;
 
-      if (option.type === 'CDB') {
+      if (isTaxableFixedIncome(option.type)) {
         irRate = getIRRate(days);
         irAmount = grossReturn * irRate;
       }
 
       const netReturn = grossReturn - irAmount;
-      const netReturnPercent = (netReturn / initialValue) * 100;
+      const netReturnPercent = initialValue > 0 ? (netReturn / initialValue) * 100 : 0;
       const finalValue = initialValue + netReturn;
 
       return {
@@ -115,15 +132,17 @@ export function RateComparator() {
     });
 
     // Find winner(s)
-    const maxNetReturn = Math.max(...results.map(r => r.netReturn));
-    results.forEach(r => {
-      if (r.netReturn === maxNetReturn) {
-        r.isWinner = true;
-      }
-    });
+    if (results.length > 0) {
+      const maxNetReturn = Math.max(...results.map(r => r.netReturn));
+      results.forEach(r => {
+        if (r.netReturn === maxNetReturn) {
+          r.isWinner = true;
+        }
+      });
+    }
 
     return results.sort((a, b) => b.netReturn - a.netReturn);
-  }, [options, initialValue, periodMonths, cdiRate, ipcaRate]);
+  }, [options, initialValue, effectiveDays, cdiRate, selicRate, ipcaRate]);
 
   const presetPeriods = [
     { label: '6 meses', value: 6 },
@@ -153,21 +172,37 @@ export function RateComparator() {
                 type="number"
                 min="0"
                 step="100"
-                value={initialValue}
-                onChange={(e) => setInitialValue(parseFloat(e.target.value) || 0)}
+                value={initialValue === 0 ? '' : initialValue}
+                onChange={(e) => setInitialValue(e.target.value === '' ? 0 : parseFloat(e.target.value))}
               />
             </div>
             <div className="space-y-2">
-              <Label>Período</Label>
+              <Label>Período / Vencimento</Label>
               <div className="flex gap-2 flex-wrap">
                 {presetPeriods.map(period => (
                   <Button
                     key={period.value}
-                    variant={periodMonths === period.value ? 'default' : 'outline'}
+                    variant={periodMode === 'months' && periodMonths === period.value ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setPeriodMonths(period.value)}
+                    onClick={() => {
+                      setPeriodMode('months');
+                      setPeriodMonths(period.value);
+                    }}
                   >
                     {period.label}
+                  </Button>
+                ))}
+                {COMPARE_YEARS.map(yr => (
+                  <Button
+                    key={yr}
+                    variant={periodMode === 'year' && targetYear === yr ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setPeriodMode('year');
+                      setTargetYear(yr);
+                    }}
+                  >
+                    Até {yr}
                   </Button>
                 ))}
               </div>
@@ -175,10 +210,11 @@ export function RateComparator() {
           </div>
 
           {/* Economic Rates */}
-          <div className="flex gap-4 p-3 bg-muted/50 rounded-lg text-sm">
+          <div className="flex flex-wrap gap-4 p-3 bg-muted/50 rounded-lg text-sm">
             <span>CDI: <strong>{cdiRate.toFixed(2)}%</strong> a.a.</span>
+            <span>Selic: <strong>{selicRate.toFixed(2)}%</strong> a.a.</span>
             <span>IPCA: <strong>{ipcaRate.toFixed(2)}%</strong> a.a.</span>
-            <span>IR ({periodMonths}m): <strong>{(getIRRate(periodMonths * 30) * 100).toFixed(1)}%</strong></span>
+            <span>IR ({effectiveDays}d): <strong>{(getIRRate(effectiveDays) * 100).toFixed(1)}%</strong></span>
           </div>
 
           {/* Add New Option */}
@@ -186,34 +222,49 @@ export function RateComparator() {
             <p className="font-medium text-sm">Adicionar Investimento</p>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <Input
-                placeholder="Nome"
+                placeholder="Nome (ex: Tesouro 2034)"
                 value={newOption.name}
                 onChange={(e) => setNewOption({ ...newOption, name: e.target.value })}
               />
-              <Select value={newOption.type} onValueChange={(v) => setNewOption({ ...newOption, type: v as 'CDB' | 'LCA' })}>
+              <Select
+                value={newOption.type}
+                onValueChange={(v) => {
+                  const nextType = v as InvestmentOption['type'];
+                  setNewOption({
+                    ...newOption,
+                    type: nextType,
+                    rateType: nextType === 'TESOURO' && newOption.rateType === 'CDI' ? 'PREFIXADO' : newOption.rateType,
+                    rateValue: nextType === 'TESOURO' && newOption.rateType === 'CDI' ? 15.03 : newOption.rateValue,
+                  });
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="CDB">CDB</SelectItem>
                   <SelectItem value="LCA">LCA</SelectItem>
+                  <SelectItem value="TESOURO">Tesouro Direto</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={newOption.rateType} onValueChange={(v) => setNewOption({ ...newOption, rateType: v as 'CDI' | 'IPCA' | 'PREFIXADO' })}>
+              <Select value={newOption.rateType} onValueChange={(v) => setNewOption({ ...newOption, rateType: v as InvestmentOption['rateType'] })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="CDI">% CDI</SelectItem>
+                  <SelectItem value="SELIC">Selic +</SelectItem>
                   <SelectItem value="IPCA">IPCA +</SelectItem>
                   <SelectItem value="PREFIXADO">Prefixado</SelectItem>
                 </SelectContent>
               </Select>
               <Input
                 type="number"
+                step="0.01"
+                min="0"
                 placeholder="Taxa"
-                value={newOption.rateValue}
-                onChange={(e) => setNewOption({ ...newOption, rateValue: parseFloat(e.target.value) || 0 })}
+                value={newOption.rateValue === 0 && newOption.rateType !== 'SELIC' ? '' : newOption.rateValue}
+                onChange={(e) => setNewOption({ ...newOption, rateValue: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
               />
               <Button onClick={addOption} disabled={!newOption.name.trim()}>
                 <Plus className="h-4 w-4 mr-1" />
@@ -267,12 +318,16 @@ export function RateComparator() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={result.option.type === 'CDB' ? 'default' : 'secondary'}>
-                        {result.option.type}
+                      <Badge
+                        variant={result.option.type === 'CDB' ? 'default' : result.option.type === 'TESOURO' ? 'outline' : 'secondary'}
+                        className={result.option.type === 'TESOURO' ? 'bg-[hsl(38,92%,50%)] text-white border-[hsl(38,92%,50%)]' : ''}
+                      >
+                        {result.option.type === 'TESOURO' ? 'Tesouro' : result.option.type}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       {result.option.rateType === 'CDI' && `${result.option.rateValue}% CDI`}
+                      {result.option.rateType === 'SELIC' && (result.option.rateValue === 0 ? '100% Selic' : `Selic + ${result.option.rateValue}%`)}
                       {result.option.rateType === 'IPCA' && `IPCA + ${result.option.rateValue}%`}
                       {result.option.rateType === 'PREFIXADO' && `${result.option.rateValue}% a.a.`}
                     </TableCell>
@@ -338,7 +393,7 @@ export function RateComparator() {
                 <p className="text-sm text-muted-foreground">
                   Com um rendimento líquido de {formatCurrency(comparison[0].netReturn)}, 
                   você ganha {formatCurrency(comparison[0].netReturn - comparison[1].netReturn)} a mais 
-                  que a segunda melhor opção em {periodMonths} meses.
+                  que a segunda melhor opção {periodMode === 'year' ? `até ${targetYear}` : `em ${periodMonths} meses`}.
                 </p>
               </div>
             </div>

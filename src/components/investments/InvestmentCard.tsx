@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import type { InvestmentCalculation } from '@/types/investment';
 import type { StockQuote } from '@/hooks/useStockQuotes';
-import { formatCurrency, formatPercent, formatRateValue } from '@/utils/investmentCalculations';
+import { formatCurrency, formatPercent, formatRateValue, isTaxableFixedIncome } from '@/utils/investmentCalculations';
 
 interface InvestmentCardProps {
   calculation: InvestmentCalculation;
@@ -18,13 +18,22 @@ interface InvestmentCardProps {
 const TYPE_COLORS = {
   CDB: 'hsl(var(--chart-1))',
   LCA: 'hsl(var(--chart-2))',
+  TESOURO: 'hsl(38, 92%, 50%)',
   ACAO: 'hsl(280, 70%, 50%)', // Purple for stocks
 };
 
 const TYPE_BADGE_VARIANTS = {
   CDB: 'default',
   LCA: 'secondary',
+  TESOURO: 'outline',
   ACAO: 'outline',
+} as const;
+
+const TYPE_LABELS = {
+  CDB: 'CDB',
+  LCA: 'LCA',
+  TESOURO: 'Tesouro Direto',
+  ACAO: 'AÇÃO',
 } as const;
 
 export function InvestmentCard({ calculation, onClick, stockQuote }: InvestmentCardProps) {
@@ -51,9 +60,15 @@ export function InvestmentCard({ calculation, onClick, stockQuote }: InvestmentC
             <div className="flex items-center gap-2">
               <Badge 
                 variant={TYPE_BADGE_VARIANTS[investment.type]}
-                className={investment.type === 'ACAO' ? 'bg-[hsl(280,70%,50%)] text-white border-[hsl(280,70%,50%)]' : ''}
+                className={
+                  investment.type === 'ACAO'
+                    ? 'bg-[hsl(280,70%,50%)] text-white border-[hsl(280,70%,50%)]'
+                    : investment.type === 'TESOURO'
+                      ? 'bg-[hsl(38,92%,50%)] text-white border-[hsl(38,92%,50%)]'
+                      : ''
+                }
               >
-                {investment.type === 'ACAO' ? 'AÇÃO' : investment.type}
+                {TYPE_LABELS[investment.type]}
               </Badge>
               {isStock && investment.ticker && (
                 <Badge variant="outline" className="font-mono text-xs">
@@ -175,7 +190,7 @@ export function InvestmentCard({ calculation, onClick, stockQuote }: InvestmentC
                   {isPositive ? '+' : ''}{formatCurrency(netReturn)} ({formatPercent(netReturnPercent)})
                 </span>
               </div>
-              {investment.type === 'CDB' && (
+              {isTaxableFixedIncome(investment.type) && (
                 <span className="text-xs text-muted-foreground">
                   IR: {(irRate * 100).toFixed(1)}%
                 </span>

@@ -82,6 +82,12 @@ export function DashboardSummary({ summary }: DashboardSummaryProps) {
               <p className="text-base sm:text-xl font-bold text-chart-2">{summary.lcaCount}</p>
               <p className="text-xs text-muted-foreground">{summary.lcaCount === 1 ? 'LCA' : 'LCAs'}</p>
             </div>
+            {summary.tesouroCount > 0 && (
+              <div className="min-w-0">
+                <p className="text-base sm:text-xl font-bold text-[hsl(38,92%,50%)]">{summary.tesouroCount}</p>
+                <p className="text-xs text-muted-foreground">Tesouro</p>
+              </div>
+            )}
             {summary.stockCount > 0 && (
               <div className="min-w-0">
                 <p className="text-base sm:text-xl font-bold text-[hsl(280,70%,50%)]">{summary.stockCount}</p>

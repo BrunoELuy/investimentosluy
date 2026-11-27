@@ -23,19 +23,23 @@ import { FutureDividendsChart } from './FutureDividendsChart';
 interface PortfolioChartsProps {
   calculations: InvestmentCalculation[];
   cdiRate?: number;
+  selicRate?: number;
   ipcaRate?: number;
 }
 
-export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }: PortfolioChartsProps) {
+export function PortfolioCharts({ calculations, cdiRate = 14.9, selicRate = 10.5, ipcaRate = 4.5 }: PortfolioChartsProps) {
   const activeCalcs = calculations.filter(c => c.investment.is_active);
 
-  // Distribution by type (CDB, LCA, Ações)
+  // Distribution by type (CDB, LCA, Tesouro Direto, Ações)
   const typeDistribution = useMemo(() => {
     const cdbTotal = activeCalcs
       .filter(c => c.investment.type === 'CDB')
       .reduce((sum, c) => sum + c.currentNetValue, 0);
     const lcaTotal = activeCalcs
       .filter(c => c.investment.type === 'LCA')
+      .reduce((sum, c) => sum + c.currentNetValue, 0);
+    const tesouroTotal = activeCalcs
+      .filter(c => c.investment.type === 'TESOURO')
       .reduce((sum, c) => sum + c.currentNetValue, 0);
     const stockTotal = activeCalcs
       .filter(c => c.investment.type === 'ACAO')
@@ -44,6 +48,7 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
     return [
       { name: 'CDB', value: cdbTotal, fill: 'hsl(var(--chart-1))' },
       { name: 'LCA', value: lcaTotal, fill: 'hsl(var(--chart-2))' },
+      { name: 'Tesouro', value: tesouroTotal, fill: 'hsl(38, 92%, 50%)' },
       { name: 'Ações', value: stockTotal, fill: 'hsl(280, 70%, 50%)' },
     ].filter(d => d.value > 0);
   }, [activeCalcs]);
@@ -126,7 +131,8 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
             cdiRate,
             ipcaRate,
             startDate,
-            calcEnd
+            calcEnd,
+            selicRate
           );
         }
 
@@ -148,7 +154,8 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
                 cdiRate,
                 ipcaRate,
                 depDate,
-                depEnd
+                depEnd,
+                selicRate
               );
             }
           }
@@ -170,11 +177,12 @@ export function PortfolioCharts({ calculations, cdiRate = 14.9, ipcaRate = 4.5 }
     }
 
     return data;
-  }, [activeCalcs, cdiRate, ipcaRate]);
+  }, [activeCalcs, cdiRate, selicRate, ipcaRate]);
 
   const chartConfigType = {
     CDB: { label: 'CDB', color: 'hsl(var(--chart-1))' },
     LCA: { label: 'LCA', color: 'hsl(var(--chart-2))' },
+    Tesouro: { label: 'Tesouro Direto', color: 'hsl(38, 92%, 50%)' },
     Ações: { label: 'Ações', color: 'hsl(280, 70%, 50%)' },
   };
 

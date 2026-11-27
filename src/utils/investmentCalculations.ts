@@ -1,6 +1,10 @@
 import { differenceInDays, parseISO, format, isAfter, isBefore } from 'date-fns';
-import type { Investment, InvestmentCalculation, DashboardSummary, InvestmentDeposit } from '@/types/investment';
+import type { Investment, InvestmentCalculation, DashboardSummary, InvestmentDeposit, InvestmentType } from '@/types/investment';
 import { calculateHistoricalCDIReturn } from './historicalCDIRates';
+
+export function isTaxableFixedIncome(type: InvestmentType | string): boolean {
+  return type === 'CDB' || type === 'TESOURO';
+}
 
 // IR rates based on investment duration (only for CDB)
 const IR_RATES = [
@@ -48,7 +52,8 @@ export function calculateGrossReturn(
   cdiRate: number,
   ipcaRate: number,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  selicRate: number = 10.5
 ): number {
   // For CDI-indexed investments with historical dates, use monthly historical rates
   if (rateType === 'CDI' && startDate && endDate) {
@@ -68,6 +73,10 @@ export function calculateGrossReturn(
     case 'CDI':
       // rateValue is percentage of CDI (e.g., 110 means 110% of CDI)
       annualRate = (cdiRate * rateValue) / 100;
+      break;
+    case 'SELIC':
+      // rateValue is the fixed spread added to SELIC (e.g., 0.10 means SELIC + 0.10% a.a.)
+      annualRate = selicRate + rateValue;
       break;
     case 'IPCA':
       // rateValue is the fixed rate added to IPCA
@@ -94,7 +103,8 @@ export function calculateInvestment(
   investment: Investment,
   cdiRate: number = 10.65,
   ipcaRate: number = 4.5,
-  deposits: InvestmentDeposit[] = []
+  deposits: InvestmentDeposit[] = [],
+  selicRate: number = 10.5
 ): InvestmentCalculation {
   const today = new Date();
   const startDate = parseISO(investment.start_date);
@@ -143,7 +153,8 @@ export function calculateInvestment(
     cdiRate,
     ipcaRate,
     startDate,
-    calculationEndDate
+    calculationEndDate,
+    selicRate
   );
   
   // Calculate return for each deposit
@@ -163,7 +174,8 @@ export function calculateInvestment(
           cdiRate,
           ipcaRate,
           depositDate,
-          calculationEndDate
+          calculationEndDate,
+          selicRate
         );
         totalGrossReturn += depositReturn;
       }
@@ -173,14 +185,14 @@ export function calculateInvestment(
   // Total invested = initial value + all deposits
   const totalInvested = investment.initial_value + deposits.reduce((sum, d) => sum + d.amount, 0);
   const currentValue = totalInvested + totalGrossReturn;
-  const grossReturnPercent = (totalGrossReturn / totalInvested) * 100;
+  const grossReturnPercent = totalInvested > 0 ? (totalGrossReturn / totalInvested) * 100 : 0;
   
-  // Calculate taxes (LCA is tax-exempt for individuals)
+  // Calculate taxes (LCA is tax-exempt; CDB and Tesouro Direto follow regressive IR + 30-day IOF)
   let irRate = 0;
   let irAmount = 0;
   let iofAmount = 0;
   
-  if (investment.type === 'CDB') {
+  if (isTaxableFixedIncome(investment.type)) {
     // IOF (only in first 30 days of initial investment)
     if (effectiveDays < 30) {
       const iofRate = getIOFRate(effectiveDays);
@@ -193,7 +205,8 @@ export function calculateInvestment(
         cdiRate,
         ipcaRate,
         startDate,
-        calculationEndDate
+        calculationEndDate,
+        selicRate
       );
       iofAmount = initialReturn * iofRate;
     }
@@ -264,6 +277,7 @@ export function calculateDashboardSummary(
     totalNetPercent,
     cdbCount: calculations.filter(c => c.investment.type === 'CDB').length,
     lcaCount: calculations.filter(c => c.investment.type === 'LCA').length,
+    tesouroCount: calculations.filter(c => c.investment.type === 'TESOURO').length,
     stockCount: calculations.filter(c => c.investment.type === 'ACAO').length,
     activeCount: activeCalcs.length,
     maturedCount: calculations.filter(c => c.isMatured).length,
@@ -294,6 +308,8 @@ export function getRateTypeLabel(rateType: string): string {
   switch (rateType) {
     case 'CDI':
       return '% do CDI';
+    case 'SELIC':
+      return 'Selic +';
     case 'IPCA':
       return 'IPCA +';
     case 'PREFIXADO':
@@ -307,6 +323,8 @@ export function formatRateValue(rateType: string, rateValue: number): string {
   switch (rateType) {
     case 'CDI':
       return `${rateValue.toFixed(0)}% do CDI`;
+    case 'SELIC':
+      return rateValue === 0 ? '100% Selic' : `Selic + ${rateValue.toFixed(2)}%`;
     case 'IPCA':
       return `IPCA + ${rateValue.toFixed(2)}%`;
     case 'PREFIXADO':

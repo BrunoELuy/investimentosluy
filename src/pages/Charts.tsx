@@ -2,7 +2,7 @@ import { PortfolioCharts } from '@/components/charts/PortfolioCharts';
 import { useInvestmentCalculations } from '@/hooks/useInvestmentCalculations';
 
 export default function Charts() {
-  const { calculations, cdiRate, ipcaRate, isLoading } =
+  const { calculations, cdiRate, selicRate, ipcaRate, isLoading } =
     useInvestmentCalculations();
 
   if (isLoading) {
@@ -17,6 +17,7 @@ export default function Charts() {
     <PortfolioCharts
       calculations={calculations}
       cdiRate={cdiRate}
+      selicRate={selicRate}
       ipcaRate={ipcaRate}
     />
   );

@@ -33,12 +33,14 @@ import {
 } from '@/components/ui/popover';
 import type { InvestmentFormData, Investment } from '@/types/investment';
 
+const TESOURO_MATURITY_YEARS = [2027, 2029, 2031, 2034, 2035, 2040, 2045];
+
 const formSchema = z.object({
-  type: z.enum(['CDB', 'LCA', 'ACAO']),
+  type: z.enum(['CDB', 'LCA', 'TESOURO', 'ACAO']),
   institution: z.string().min(2, 'Instituição deve ter pelo menos 2 caracteres').max(100),
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100),
   initial_value: z.number().min(1, 'Valor deve ser maior que zero'),
-  rate_type: z.enum(['CDI', 'IPCA', 'PREFIXADO', 'NONE']),
+  rate_type: z.enum(['CDI', 'SELIC', 'IPCA', 'PREFIXADO', 'NONE']),
   rate_value: z.number().min(0),
   start_date: z.date(),
   end_date: z.date(),
@@ -63,8 +65,8 @@ const formSchema = z.object({
   message: 'Quantidade de papéis é obrigatória para ações',
   path: ['quantity'],
 }).refine(data => {
-  // For fixed income, rate_value must be > 0
-  if (data.type !== 'ACAO' && data.rate_value <= 0) {
+  // For fixed income (except SELIC which can be 100% Selic = Selic + 0%), rate_value must be > 0
+  if (data.type !== 'ACAO' && data.rate_type !== 'SELIC' && data.rate_value <= 0) {
     return false;
   }
   return true;
@@ -113,22 +115,45 @@ export function InvestmentForm({ investment, onSubmit, onCancel }: InvestmentFor
 
   const investmentType = form.watch('type');
   const rateType = form.watch('rate_type');
+  const endDate = form.watch('end_date');
   const isStock = investmentType === 'ACAO';
+  const isTesouro = investmentType === 'TESOURO';
 
-  // When type changes to ACAO, set default rate values
-  const handleTypeChange = (value: 'CDB' | 'LCA' | 'ACAO') => {
+  // When type changes, set appropriate default rate values
+  const handleTypeChange = (value: 'CDB' | 'LCA' | 'TESOURO' | 'ACAO') => {
     form.setValue('type', value);
     if (value === 'ACAO') {
       form.setValue('rate_type', 'NONE');
       form.setValue('rate_value', 0);
       // Set end_date to far future for stocks
       form.setValue('end_date', new Date('2099-12-31'));
+    } else if (value === 'TESOURO') {
+      const currentRateType = form.getValues('rate_type');
+      if (currentRateType === 'NONE' || currentRateType === 'CDI') {
+        form.setValue('rate_type', 'PREFIXADO');
+        form.setValue('rate_value', 15.03);
+      }
+      if (!form.getValues('institution')) {
+        form.setValue('institution', 'Tesouro Direto');
+      }
+      const currentEnd = form.getValues('end_date');
+      if (!currentEnd || currentEnd.getFullYear() <= new Date().getFullYear()) {
+        form.setValue('end_date', new Date(2034, 0, 1));
+      }
     } else {
-      if (form.getValues('rate_type') === 'NONE') {
+      const currentRateType = form.getValues('rate_type');
+      if (currentRateType === 'NONE' || currentRateType === 'SELIC') {
         form.setValue('rate_type', 'CDI');
         form.setValue('rate_value', 100);
       }
     }
+  };
+
+  const handleSelectTesouroYear = (year: number) => {
+    const currentEnd = form.getValues('end_date');
+    const month = currentEnd ? currentEnd.getMonth() : 0;
+    const day = currentEnd ? currentEnd.getDate() : 1;
+    form.setValue('end_date', new Date(year, month, day), { shouldValidate: true });
   };
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -163,7 +188,7 @@ export function InvestmentForm({ investment, onSubmit, onCancel }: InvestmentFor
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Tipo de Investimento</FormLabel>
-                <Select onValueChange={handleTypeChange} defaultValue={field.value}>
+                <Select onValueChange={handleTypeChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o tipo" />
@@ -172,12 +197,14 @@ export function InvestmentForm({ investment, onSubmit, onCancel }: InvestmentFor
                   <SelectContent>
                     <SelectItem value="CDB">CDB</SelectItem>
                     <SelectItem value="LCA">LCA</SelectItem>
+                    <SelectItem value="TESOURO">Tesouro Direto</SelectItem>
                     <SelectItem value="ACAO">Ação</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormDescription>
                   {field.value === 'LCA' && 'Isento de IR para pessoa física'}
                   {field.value === 'CDB' && 'IR regressivo aplicável'}
+                  {field.value === 'TESOURO' && 'Título público federal · IR regressivo aplicável'}
                   {field.value === 'ACAO' && 'Renda variável - Bolsa de Valores'}
                 </FormDescription>
                 <FormMessage />
@@ -192,7 +219,16 @@ export function InvestmentForm({ investment, onSubmit, onCancel }: InvestmentFor
               <FormItem>
                 <FormLabel>{isStock ? 'Corretora' : 'Instituição'}</FormLabel>
                 <FormControl>
-                  <Input placeholder={isStock ? 'Ex: XP, Clear, Rico...' : 'Ex: Nubank, Inter, XP...'} {...field} />
+                  <Input
+                    placeholder={
+                      isStock
+                        ? 'Ex: XP, Clear, Rico...'
+                        : isTesouro
+                          ? 'Ex: Tesouro Direto, NuInvest, XP...'
+                          : 'Ex: Nubank, Inter, XP...'
+                    }
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -208,7 +244,16 @@ export function InvestmentForm({ investment, onSubmit, onCancel }: InvestmentFor
               <FormItem>
                 <FormLabel>{isStock ? 'Nome da Empresa' : 'Nome do Investimento'}</FormLabel>
                 <FormControl>
-                  <Input placeholder={isStock ? 'Ex: BB Seguridade' : 'Ex: CDB 120% CDI Nubank'} {...field} />
+                  <Input
+                    placeholder={
+                      isStock
+                        ? 'Ex: BB Seguridade'
+                        : isTesouro
+                          ? 'Ex: Tesouro Prefixado 2034'
+                          : 'Ex: CDB 120% CDI Nubank'
+                    }
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -290,7 +335,7 @@ export function InvestmentForm({ investment, onSubmit, onCancel }: InvestmentFor
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo de Rentabilidade</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione" />
@@ -298,6 +343,7 @@ export function InvestmentForm({ investment, onSubmit, onCancel }: InvestmentFor
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="CDI">% do CDI</SelectItem>
+                      <SelectItem value="SELIC">Pós-fixado (Selic +)</SelectItem>
                       <SelectItem value="IPCA">IPCA +</SelectItem>
                       <SelectItem value="PREFIXADO">Prefixado</SelectItem>
                     </SelectContent>
@@ -313,23 +359,38 @@ export function InvestmentForm({ investment, onSubmit, onCancel }: InvestmentFor
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    {rateType === 'CDI' ? '% do CDI' : rateType === 'IPCA' ? 'Taxa adicional (%)' : 'Taxa anual (%)'}
+                    {rateType === 'CDI'
+                      ? '% do CDI'
+                      : rateType === 'SELIC'
+                        ? 'Adicional à Selic (%)'
+                        : rateType === 'IPCA'
+                          ? 'Taxa adicional (%)'
+                          : 'Taxa anual (%)'}
                   </FormLabel>
                   <FormControl>
                     <Input 
                       type="number" 
                       step="0.01" 
                       min="0"
-                      placeholder={rateType === 'CDI' ? '110' : '6.00'} 
+                      placeholder={
+                        rateType === 'CDI'
+                          ? '110'
+                          : rateType === 'SELIC'
+                            ? '0.10'
+                            : rateType === 'IPCA'
+                              ? '6.00'
+                              : '15.03'
+                      }
                       {...field}
-                      value={field.value === 0 ? '' : field.value}
+                      value={field.value === 0 && rateType !== 'SELIC' ? '' : field.value}
                       onChange={e => field.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value))}
                     />
                   </FormControl>
                   <FormDescription>
                     {rateType === 'CDI' && 'Ex: 110 para 110% do CDI'}
+                    {rateType === 'SELIC' && 'Ex: 0.10 para Selic + 0,10% a.a. (0 para 100% Selic)'}
                     {rateType === 'IPCA' && 'Ex: 6.00 para IPCA + 6%'}
-                    {rateType === 'PREFIXADO' && 'Ex: 12.50 para 12,50% a.a.'}
+                    {rateType === 'PREFIXADO' && 'Ex: 15.03 para 15,03% a.a.'}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -387,36 +448,53 @@ export function InvestmentForm({ investment, onSubmit, onCancel }: InvestmentFor
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Data de Vencimento</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            'w-full pl-3 text-left font-normal',
-                            !field.value && 'text-muted-foreground'
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, 'dd/MM/yyyy', { locale: ptBR })
-                          ) : (
-                            <span>Selecione</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                  <div className="flex gap-2">
+                    <Input
+                      type="date"
+                      value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                      onChange={(e) => {
+                        if (!e.target.value) return;
+                        const [y, m, d] = e.target.value.split('-').map(Number);
+                        field.onChange(new Date(y, m - 1, d));
+                      }}
+                      className="flex-1"
+                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button type="button" variant="outline" size="icon" title="Abrir calendário">
+                          <CalendarIcon className="h-4 w-4 opacity-70" />
                         </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={(date) => date < new Date()}
-                        initialFocus
-                        className="p-3 pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="end">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          defaultMonth={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date < new Date()}
+                          initialFocus
+                          className="p-3 pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  {isTesouro && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      <span className="text-xs text-muted-foreground self-center mr-1">Ano:</span>
+                      {TESOURO_MATURITY_YEARS.map((yr) => (
+                        <Button
+                          key={yr}
+                          type="button"
+                          size="sm"
+                          variant={endDate?.getFullYear() === yr ? 'default' : 'outline'}
+                          className="h-6 px-2 text-xs"
+                          onClick={() => handleSelectTesouroYear(yr)}
+                        >
+                          {yr}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

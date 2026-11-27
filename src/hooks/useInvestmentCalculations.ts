@@ -10,6 +10,7 @@ export function useInvestmentCalculations() {
   const { data: investments, isLoading } = useInvestments();
   const { data: rates } = useEconomicRates();
   const cdiRate = rates?.cdi ?? 14.9;
+  const selicRate = rates?.selic ?? 10.5;
   const ipcaRate = rates?.ipca ?? 4.5;
 
   const investmentIds = useMemo(
@@ -30,9 +31,9 @@ export function useInvestmentCalculations() {
   const calculations = useMemo(
     () =>
       (investments || []).map(inv =>
-        calculateInvestment(inv, cdiRate, ipcaRate, depositsByInvestment[inv.id] || [])
+        calculateInvestment(inv, cdiRate, ipcaRate, depositsByInvestment[inv.id] || [], selicRate)
       ),
-    [investments, depositsByInvestment, cdiRate, ipcaRate]
+    [investments, depositsByInvestment, cdiRate, ipcaRate, selicRate]
   );
 
   const summary: DashboardSummary = useMemo(() => {
@@ -49,6 +50,7 @@ export function useInvestmentCalculations() {
       totalNetPercent: totalInvested > 0 ? (totalNetReturn / totalInvested) * 100 : 0,
       cdbCount: calculations.filter(c => c.investment.type === 'CDB').length,
       lcaCount: calculations.filter(c => c.investment.type === 'LCA').length,
+      tesouroCount: calculations.filter(c => c.investment.type === 'TESOURO').length,
       stockCount: calculations.filter(c => c.investment.type === 'ACAO').length,
       activeCount: activeCalcs.length,
       maturedCount: calculations.filter(c => c.isMatured).length,
@@ -62,6 +64,7 @@ export function useInvestmentCalculations() {
     summary,
     stockQuotes,
     cdiRate,
+    selicRate,
     ipcaRate,
     isLoading,
   };

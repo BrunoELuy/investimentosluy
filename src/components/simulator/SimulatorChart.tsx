@@ -4,15 +4,16 @@ import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
-import { calculateGrossReturn, getIRRate, formatCurrency } from '@/utils/investmentCalculations';
+import { calculateGrossReturn, getIRRate, formatCurrency, isTaxableFixedIncome } from '@/utils/investmentCalculations';
 
 interface SimulatorChartProps {
   initialValue: number;
   rateType: string;
   rateValue: number;
-  investmentType: 'CDB' | 'LCA';
+  investmentType: 'CDB' | 'LCA' | 'TESOURO';
   days: number;
   cdiRate: number;
+  selicRate?: number;
   ipcaRate: number;
 }
 
@@ -23,8 +24,11 @@ export function SimulatorChart({
   investmentType,
   days,
   cdiRate,
+  selicRate = 10.5,
   ipcaRate,
 }: SimulatorChartProps) {
+  const isTaxable = isTaxableFixedIncome(investmentType);
+
   const chartData = useMemo(() => {
     const data = [];
     const startDate = new Date();
@@ -39,13 +43,16 @@ export function SimulatorChart({
         rateValue,
         d,
         cdiRate,
-        ipcaRate
+        ipcaRate,
+        undefined,
+        undefined,
+        selicRate
       );
       
       const grossValue = initialValue + grossReturn;
       
       let netValue = grossValue;
-      if (investmentType === 'CDB' && d > 0) {
+      if (isTaxable && d > 0) {
         const irRate = getIRRate(d);
         const irAmount = grossReturn * irRate;
         netValue = initialValue + grossReturn - irAmount;
@@ -69,11 +76,14 @@ export function SimulatorChart({
         rateValue,
         days,
         cdiRate,
-        ipcaRate
+        ipcaRate,
+        undefined,
+        undefined,
+        selicRate
       );
       const grossValue = initialValue + grossReturn;
       let netValue = grossValue;
-      if (investmentType === 'CDB') {
+      if (isTaxable) {
         const irRate = getIRRate(days);
         const irAmount = grossReturn * irRate;
         netValue = initialValue + grossReturn - irAmount;
@@ -90,7 +100,7 @@ export function SimulatorChart({
     }
 
     return data;
-  }, [initialValue, rateType, rateValue, investmentType, days, cdiRate, ipcaRate]);
+  }, [initialValue, rateType, rateValue, isTaxable, days, cdiRate, selicRate, ipcaRate]);
 
   const chartConfig = {
     grossValue: {
@@ -153,7 +163,7 @@ export function SimulatorChart({
               fill="url(#grossGradient)"
               strokeWidth={2}
             />
-            {investmentType === 'CDB' && (
+            {isTaxable && (
               <Area
                 type="monotone"
                 dataKey="netValue"
@@ -170,7 +180,7 @@ export function SimulatorChart({
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'hsl(var(--chart-1))' }} />
             <span className="text-sm text-muted-foreground">Valor Bruto</span>
           </div>
-          {investmentType === 'CDB' && (
+          {isTaxable && (
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'hsl(var(--chart-2))' }} />
               <span className="text-sm text-muted-foreground">Valor Líquido</span>

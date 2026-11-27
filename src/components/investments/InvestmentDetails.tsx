@@ -30,7 +30,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import type { InvestmentCalculation } from '@/types/investment';
-import { formatCurrency, formatPercent, formatRateValue, getIRRate } from '@/utils/investmentCalculations';
+import { formatCurrency, formatPercent, formatRateValue, getIRRate, isTaxableFixedIncome } from '@/utils/investmentCalculations';
 import { DepositsList } from './DepositsList';
 import { StockDetails } from './StockDetails';
 
@@ -87,8 +87,8 @@ export function InvestmentDetails({ calculation, onBack, onEdit, onDelete }: Inv
     }
   };
 
-  // Calculate IR schedule for CDB
-  const irSchedule = investment.type === 'CDB' ? [
+  // Calculate IR schedule for CDB and Tesouro Direto
+  const irSchedule = isTaxableFixedIncome(investment.type) ? [
     { days: 180, rate: 0.225, label: 'Até 180 dias' },
     { days: 360, rate: 0.20, label: '181 a 360 dias' },
     { days: 720, rate: 0.175, label: '361 a 720 dias' },
@@ -133,13 +133,26 @@ export function InvestmentDetails({ calculation, onBack, onEdit, onDelete }: Inv
       </div>
 
       {/* Header Card */}
-      <Card className="border-l-4" style={{ borderLeftColor: investment.type === 'CDB' ? 'hsl(var(--chart-1))' : 'hsl(var(--chart-2))' }}>
+      <Card
+        className="border-l-4"
+        style={{
+          borderLeftColor:
+            investment.type === 'CDB'
+              ? 'hsl(var(--chart-1))'
+              : investment.type === 'TESOURO'
+                ? 'hsl(38, 92%, 50%)'
+                : 'hsl(var(--chart-2))',
+        }}
+      >
         <CardHeader>
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <Badge variant={investment.type === 'CDB' ? 'default' : 'secondary'} className="text-sm">
-                  {investment.type}
+                <Badge
+                  variant={investment.type === 'CDB' ? 'default' : investment.type === 'TESOURO' ? 'outline' : 'secondary'}
+                  className={`text-sm ${investment.type === 'TESOURO' ? 'bg-[hsl(38,92%,50%)] text-white border-[hsl(38,92%,50%)]' : ''}`}
+                >
+                  {investment.type === 'TESOURO' ? 'Tesouro Direto' : investment.type}
                 </Badge>
                 {investment.type === 'LCA' && (
                   <Badge variant="outline" className="text-success border-success">
@@ -244,13 +257,13 @@ export function InvestmentDetails({ calculation, onBack, onEdit, onDelete }: Inv
         </Card>
       </div>
 
-      {/* Tax Info for CDB */}
-      {investment.type === 'CDB' && (
+      {/* Tax Info for CDB and Tesouro Direto */}
+      {isTaxableFixedIncome(investment.type) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
-              Tributação (CDB)
+              Tributação ({investment.type === 'TESOURO' ? 'Tesouro Direto' : 'CDB'})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">

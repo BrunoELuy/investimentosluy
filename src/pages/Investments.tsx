@@ -34,10 +34,10 @@ export default function Investments() {
     return [...calculations].sort((a, b) => {
       switch (sortOption) {
         case 'type': {
-          const order = { CDB: 0, LCA: 1, ACAO: 2 };
+          const order = { CDB: 0, LCA: 1, TESOURO: 2, ACAO: 3 };
           return (
-            (order[a.investment.type as keyof typeof order] ?? 3) -
-            (order[b.investment.type as keyof typeof order] ?? 3)
+            (order[a.investment.type as keyof typeof order] ?? 4) -
+            (order[b.investment.type as keyof typeof order] ?? 4)
           );
         }
         case 'institution':

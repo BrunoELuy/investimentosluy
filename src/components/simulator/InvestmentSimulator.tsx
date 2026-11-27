@@ -20,12 +20,14 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useEconomicRates } from '@/hooks/useEconomicRates';
-import { calculateGrossReturn, getIRRate, formatCurrency, formatPercent } from '@/utils/investmentCalculations';
+import { calculateGrossReturn, getIRRate, formatCurrency, formatPercent, isTaxableFixedIncome } from '@/utils/investmentCalculations';
 import { SimulatorChart } from './SimulatorChart';
 
-type InvestmentType = 'CDB' | 'LCA';
-type RateType = 'CDI' | 'IPCA' | 'PREFIXADO';
-type PeriodType = 'days' | 'months' | 'years' | 'custom';
+type InvestmentType = 'CDB' | 'LCA' | 'TESOURO';
+type RateType = 'CDI' | 'SELIC' | 'IPCA' | 'PREFIXADO';
+type PeriodType = 'days' | 'months' | 'years' | 'targetYear' | 'custom';
+
+const TESOURO_PRESET_YEARS = [2027, 2029, 2031, 2034, 2035, 2040, 2045];
 
 interface SimulationResult {
   grossValue: number;
@@ -43,6 +45,7 @@ interface SimulationResult {
 export function InvestmentSimulator() {
   const { data: rates, isLoading: ratesLoading } = useEconomicRates();
   const cdiRate = rates?.cdi ?? 10.65;
+  const selicRate = rates?.selic ?? 10.5;
   const ipcaRate = rates?.ipca ?? 4.5;
   
   const [investmentType, setInvestmentType] = useState<InvestmentType>('CDB');
@@ -51,10 +54,30 @@ export function InvestmentSimulator() {
   const [rateValue, setRateValue] = useState<number>(110);
   const [periodType, setPeriodType] = useState<PeriodType>('years');
   const [periodValue, setPeriodValue] = useState<number>(1);
+  const [targetYear, setTargetYear] = useState<number>(2034);
   const [customEndDate, setCustomEndDate] = useState<string>('');
 
+  const handleInvestmentTypeChange = (nextType: InvestmentType) => {
+    setInvestmentType(nextType);
+    if (nextType === 'TESOURO') {
+      if (rateType === 'CDI') {
+        setRateType('PREFIXADO');
+        setRateValue(15.03);
+      }
+      if (periodType !== 'targetYear' && periodType !== 'custom') {
+        setPeriodType('targetYear');
+        setTargetYear(2034);
+      }
+    } else if (rateType === 'SELIC') {
+      setRateType('CDI');
+      setRateValue(100);
+    }
+  };
+
   const simulation = useMemo((): SimulationResult | null => {
-    if (initialValue <= 0 || rateValue <= 0) return null;
+    if (initialValue <= 0) return null;
+    if (rateType !== 'SELIC' && rateValue <= 0) return null;
+    if (rateType === 'SELIC' && rateValue < 0) return null;
 
     const startDate = new Date();
     let endDate: Date;
@@ -68,6 +91,10 @@ export function InvestmentSimulator() {
         break;
       case 'years':
         endDate = addYears(startDate, periodValue);
+        break;
+      case 'targetYear':
+        if (!targetYear || targetYear <= startDate.getFullYear()) return null;
+        endDate = new Date(targetYear, 0, 1);
         break;
       case 'custom':
         if (!customEndDate) return null;
@@ -86,7 +113,10 @@ export function InvestmentSimulator() {
       rateValue,
       days,
       cdiRate,
-      ipcaRate
+      ipcaRate,
+      undefined,
+      undefined,
+      selicRate
     );
 
     const grossValue = initialValue + grossReturn;
@@ -95,7 +125,7 @@ export function InvestmentSimulator() {
     let irRate = 0;
     let irAmount = 0;
 
-    if (investmentType === 'CDB') {
+    if (isTaxableFixedIncome(investmentType)) {
       irRate = getIRRate(days);
       irAmount = grossReturn * irRate;
     }
@@ -116,7 +146,7 @@ export function InvestmentSimulator() {
       days,
       endDate,
     };
-  }, [investmentType, rateType, initialValue, rateValue, periodType, periodValue, customEndDate, cdiRate, ipcaRate]);
+  }, [investmentType, rateType, initialValue, rateValue, periodType, periodValue, targetYear, customEndDate, cdiRate, selicRate, ipcaRate]);
 
   const presetPeriods = [
     { label: '6 meses', type: 'months' as PeriodType, value: 6 },
@@ -135,15 +165,19 @@ export function InvestmentSimulator() {
             Simulador de Investimentos
           </CardTitle>
           <CardDescription>
-            Calcule o rendimento estimado de seus investimentos em CDB e LCA
+            Calcule o rendimento estimado de seus investimentos em CDB, LCA e Tesouro Direto
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Economic Rates Info */}
-          <div className="flex gap-4 p-4 bg-muted/50 rounded-lg">
+          <div className="flex flex-wrap gap-4 p-4 bg-muted/50 rounded-lg">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">CDI atual:</span>
               <span className="font-semibold">{cdiRate.toFixed(2)}% a.a.</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Selic atual:</span>
+              <span className="font-semibold">{selicRate.toFixed(2)}% a.a.</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">IPCA atual:</span>
@@ -158,14 +192,19 @@ export function InvestmentSimulator() {
             {/* Investment Type */}
             <div className="space-y-2">
               <Label>Tipo de Investimento</Label>
-              <Tabs value={investmentType} onValueChange={(v) => setInvestmentType(v as InvestmentType)}>
-                <TabsList className="grid w-full grid-cols-2">
+              <Tabs value={investmentType} onValueChange={(v) => handleInvestmentTypeChange(v as InvestmentType)}>
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="CDB">CDB</TabsTrigger>
                   <TabsTrigger value="LCA">LCA</TabsTrigger>
+                  <TabsTrigger value="TESOURO">Tesouro</TabsTrigger>
                 </TabsList>
               </Tabs>
               <p className="text-xs text-muted-foreground">
-                {investmentType === 'CDB' ? 'Sujeito a IR regressivo' : 'Isento de IR para pessoa física'}
+                {investmentType === 'LCA'
+                  ? 'Isento de IR para pessoa física'
+                  : investmentType === 'TESOURO'
+                    ? 'Tesouro Direto · Sujeito a IR regressivo'
+                    : 'Sujeito a IR regressivo'}
               </p>
             </div>
 
@@ -177,8 +216,8 @@ export function InvestmentSimulator() {
                 type="number"
                 min="0"
                 step="100"
-                value={initialValue}
-                onChange={(e) => setInitialValue(parseFloat(e.target.value) || 0)}
+                value={initialValue === 0 ? '' : initialValue}
+                onChange={(e) => setInitialValue(e.target.value === '' ? 0 : parseFloat(e.target.value))}
               />
             </div>
 
@@ -191,6 +230,7 @@ export function InvestmentSimulator() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="CDI">% do CDI</SelectItem>
+                  <SelectItem value="SELIC">Pós-fixado (Selic +)</SelectItem>
                   <SelectItem value="IPCA">IPCA +</SelectItem>
                   <SelectItem value="PREFIXADO">Prefixado</SelectItem>
                 </SelectContent>
@@ -200,19 +240,27 @@ export function InvestmentSimulator() {
             {/* Rate Value */}
             <div className="space-y-2">
               <Label htmlFor="rate">
-                {rateType === 'CDI' ? '% do CDI' : rateType === 'IPCA' ? 'Taxa adicional (%)' : 'Taxa anual (%)'}
+                {rateType === 'CDI'
+                  ? '% do CDI'
+                  : rateType === 'SELIC'
+                    ? 'Adicional à Selic (%)'
+                    : rateType === 'IPCA'
+                      ? 'Taxa adicional (%)'
+                      : 'Taxa anual (%)'}
               </Label>
               <Input
                 id="rate"
                 type="number"
                 min="0"
                 step="0.01"
-                value={rateValue}
-                onChange={(e) => setRateValue(parseFloat(e.target.value) || 0)}
+                value={rateValue === 0 && rateType !== 'SELIC' ? '' : rateValue}
+                onChange={(e) => setRateValue(e.target.value === '' ? 0 : parseFloat(e.target.value))}
               />
               <p className="text-xs text-muted-foreground">
                 {rateType === 'CDI' && `Equivale a ${((rateValue / 100) * cdiRate).toFixed(2)}% a.a.`}
+                {rateType === 'SELIC' && `Rentabilidade total: ${(selicRate + rateValue).toFixed(2)}% a.a.`}
                 {rateType === 'IPCA' && `Rentabilidade total: ${(ipcaRate + rateValue).toFixed(2)}% a.a.`}
+                {rateType === 'PREFIXADO' && `Taxa fixa de ${rateValue.toFixed(2)}% a.a.`}
               </p>
             </div>
           </div>
@@ -235,6 +283,13 @@ export function InvestmentSimulator() {
                 </Button>
               ))}
               <Button
+                variant={periodType === 'targetYear' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setPeriodType('targetYear')}
+              >
+                Até o ano ({targetYear})
+              </Button>
+              <Button
                 variant={periodType === 'custom' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setPeriodType('custom')}
@@ -242,6 +297,40 @@ export function InvestmentSimulator() {
                 Personalizado
               </Button>
             </div>
+
+            {periodType === 'targetYear' && (
+              <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Ano de vencimento:</span>
+                  {TESOURO_PRESET_YEARS.map((yr) => (
+                    <Button
+                      key={yr}
+                      type="button"
+                      size="sm"
+                      variant={targetYear === yr ? 'default' : 'outline'}
+                      className="h-7 px-2.5 text-xs"
+                      onClick={() => setTargetYear(yr)}
+                    >
+                      {yr}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-3 max-w-xs">
+                  <Label htmlFor="target-year" className="text-xs whitespace-nowrap">
+                    Outro ano:
+                  </Label>
+                  <Input
+                    id="target-year"
+                    type="number"
+                    min={new Date().getFullYear() + 1}
+                    max={2070}
+                    value={targetYear === 0 ? '' : targetYear}
+                    onChange={(e) => setTargetYear(e.target.value === '' ? 0 : parseInt(e.target.value, 10))}
+                    className="h-8"
+                  />
+                </div>
+              </div>
+            )}
 
             {periodType === 'custom' && (
               <div className="flex gap-4 items-end">
@@ -305,8 +394,8 @@ export function InvestmentSimulator() {
             </Card>
           </div>
 
-          {/* Tax Details for CDB */}
-          {investmentType === 'CDB' && (
+          {/* Tax Details for CDB and Tesouro Direto */}
+          {isTaxableFixedIncome(investmentType) && (
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -357,6 +446,7 @@ export function InvestmentSimulator() {
             investmentType={investmentType}
             days={simulation.days}
             cdiRate={cdiRate}
+            selicRate={selicRate}
             ipcaRate={ipcaRate}
           />
         </>

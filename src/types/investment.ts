@@ -1,6 +1,6 @@
 // Investment types
-export type InvestmentType = 'CDB' | 'LCA' | 'ACAO';
-export type RateType = 'CDI' | 'IPCA' | 'PREFIXADO' | 'NONE';
+export type InvestmentType = 'CDB' | 'LCA' | 'TESOURO' | 'ACAO';
+export type RateType = 'CDI' | 'SELIC' | 'IPCA' | 'PREFIXADO' | 'NONE';
 
 export interface Investment {
   id: string;
@@ -108,6 +108,7 @@ export interface DashboardSummary {
   totalNetPercent: number;
   cdbCount: number;
   lcaCount: number;
+  tesouroCount: number;
   stockCount: number;
   activeCount: number;
   maturedCount: number;

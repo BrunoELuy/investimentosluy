@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { InvestmentCalculation } from '@/types/investment';
-import { formatCurrency, formatPercent, formatRateValue } from '@/utils/investmentCalculations';
+import { formatCurrency, formatPercent, formatRateValue, isTaxableFixedIncome } from '@/utils/investmentCalculations';
 
 interface ReportExporterProps {
   calculations: InvestmentCalculation[];
@@ -109,7 +109,7 @@ export function ReportExporter({ calculations }: ReportExporterProps) {
           c.investment.initial_value.toFixed(2),
           c.grossReturn.toFixed(2),
           c.iofAmount.toFixed(2),
-          c.investment.type === 'CDB' ? (c.irRate * 100).toFixed(1) + '%' : 'Isento',
+          isTaxableFixedIncome(c.investment.type) ? (c.irRate * 100).toFixed(1) + '%' : 'Isento',
           c.irAmount.toFixed(2),
           c.netReturn.toFixed(2),
         ]);
@@ -158,10 +158,10 @@ export function ReportExporter({ calculations }: ReportExporterProps) {
       content += `   Período: ${formatDate(new Date(c.investment.start_date), 'dd/MM/yyyy')} a ${formatDate(new Date(c.investment.end_date), 'dd/MM/yyyy')}\n`;
       content += `   Valor Líquido Atual: ${formatCurrency(c.currentNetValue)}\n`;
       content += `   Rendimento Líquido: ${formatCurrency(c.netReturn)} (${formatPercent(c.netReturnPercent)})\n`;
-      if (c.investment.type === 'CDB') {
+      if (isTaxableFixedIncome(c.investment.type)) {
         content += `   IR Retido: ${formatCurrency(c.irAmount)} (${(c.irRate * 100).toFixed(1)}%)\n`;
       } else {
-        content += `   IR: Isento (LCA)\n`;
+        content += `   IR: Isento (${c.investment.type})\n`;
       }
       content += '\n';
     });
