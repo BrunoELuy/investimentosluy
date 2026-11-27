@@ -36,6 +36,13 @@
       "when": 1795815298960,
       "tag": "0004_create_user_suggestions",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795815983215,
+      "tag": "0005_add_tesouro_investment_type",
+      "breakpoints": true
     }
   ]
 }
