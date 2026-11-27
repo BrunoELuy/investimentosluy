@@ -13,11 +13,15 @@ import {
   DollarSign,
   Coins,
   RefreshCw,
+  NotebookPen,
+  Check,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +36,7 @@ import {
 import type { InvestmentCalculation } from '@/types/investment';
 import { formatCurrency } from '@/utils/investmentCalculations';
 import { useStockQuotes } from '@/hooks/useStockQuotes';
+import { useUpdateInvestment } from '@/hooks/useInvestments';
 // ← Feature 4
 import { StockAporteForm } from '@/components/investments/StockAporteForm';
 import { StockAportesList } from '@/components/investments/StockAportesList';
@@ -45,11 +50,15 @@ interface StockDetailsProps {
 
 export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDetailsProps) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesValue, setNotesValue] = useState(calculation.investment.notes ?? '');
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
   const { investment } = calculation;
 
   const tickers = investment.ticker ? [investment.ticker] : [];
   const { quotes, isLoading: quotesLoading, lastUpdated, refetch } = useStockQuotes(tickers);
   const quote = investment.ticker ? quotes[investment.ticker] : undefined;
+  const updateInvestment = useUpdateInvestment();
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -58,6 +67,34 @@ export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDet
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const handleSaveNotes = async () => {
+    setIsSavingNotes(true);
+    try {
+      await updateInvestment.mutateAsync({
+        id: investment.id,
+        type: investment.type,
+        institution: investment.institution,
+        name: investment.name,
+        initial_value: investment.initial_value,
+        rate_type: investment.rate_type,
+        rate_value: investment.rate_value,
+        start_date: investment.start_date,
+        end_date: investment.end_date,
+        notes: notesValue.trim() || undefined,
+        ticker: investment.ticker ?? undefined,
+        quantity: investment.quantity ?? undefined,
+      });
+      setEditingNotes(false);
+    } finally {
+      setIsSavingNotes(false);
+    }
+  };
+
+  const handleCancelNotes = () => {
+    setNotesValue(investment.notes ?? '');
+    setEditingNotes(false);
   };
 
   const averagePrice = investment.quantity
@@ -353,17 +390,57 @@ export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDet
         </Card>
       )}
 
-      {/* Notes */}
-      {investment.notes && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Observações</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">{investment.notes}</p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Notes — Minha Tese */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <NotebookPen className="h-4 w-4 text-[hsl(280,70%,50%)]" />
+              Minha Tese / Anotações
+            </CardTitle>
+            {!editingNotes && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 h-8 text-xs"
+                onClick={() => { setNotesValue(investment.notes ?? ''); setEditingNotes(true); }}
+              >
+                <Edit className="h-3 w-3" />
+                {investment.notes ? 'Editar' : 'Adicionar anotação'}
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {editingNotes ? (
+            <div className="space-y-3">
+              <Textarea
+                value={notesValue}
+                onChange={e => setNotesValue(e.target.value)}
+                placeholder="Registre sua tese de investimento, indicadores relevantes, preço-teto, estratégia de saída..."
+                className="min-h-[120px] resize-y text-sm"
+                autoFocus
+              />
+              <div className="flex gap-2 justify-end">
+                <Button variant="ghost" size="sm" className="gap-1.5" onClick={handleCancelNotes} disabled={isSavingNotes}>
+                  <X className="h-3 w-3" />
+                  Cancelar
+                </Button>
+                <Button size="sm" className="gap-1.5" onClick={handleSaveNotes} disabled={isSavingNotes}>
+                  <Check className="h-3 w-3" />
+                  {isSavingNotes ? 'Salvando...' : 'Salvar'}
+                </Button>
+              </div>
+            </div>
+          ) : investment.notes ? (
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">{investment.notes}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground/60 italic">
+              Nenhuma anotação ainda. Registre sua tese de investimento, indicadores de entrada/saída, preço-teto...
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
