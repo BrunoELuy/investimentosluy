@@ -1,3 +1,5 @@
+import { readCache, writeCache } from '../_shared/marketCache.ts';
+import { isFresh, DIVIDENDS_TTL_MS } from '../_shared/cacheRules.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
@@ -131,18 +133,35 @@ Deno.serve(async (req) => {
     const dividends: Record<string, unknown[]> = {};
     const errors: Record<string, string> = {};
 
-    for (const ticker of unique) {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const cached = await readCache('dividends', unique);
+    const fresh: { ticker: string; payload: unknown }[] = [];
+    const toFetch: string[] = [];
+    for (const t of unique) {
+      const row = cached.get(t);
+      if (row && isFresh(row.fetched_at, DIVIDENDS_TTL_MS, now)) {
+        dividends[t] = (row.payload as { paymentDate: string }[]).filter((e) => e.paymentDate > today);
+      } else toFetch.push(t);
+    }
+
+    for (const ticker of toFetch) {
       try {
         const events = await fetchStatusInvestDividends(ticker);
         dividends[ticker] = events;
+        fresh.push({ ticker, payload: events });
         console.log(`StatusInvest ${ticker}: ${events.length} eventos futuros`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Erro desconhecido';
         console.error(`StatusInvest error for ${ticker}: ${msg}`);
-        errors[ticker] = msg;
+        const stale = cached.get(ticker);
+        if (stale) dividends[ticker] = stale.payload as unknown[];
+        else errors[ticker] = msg;
       }
       await new Promise((r) => setTimeout(r, 300));
     }
+
+    await writeCache('dividends', fresh);
 
     return new Response(JSON.stringify({ dividends, errors }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

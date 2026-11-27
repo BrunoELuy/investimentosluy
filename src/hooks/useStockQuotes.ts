@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { QUOTE_TTL_MS, isTradingHours } from '../../supabase/functions/_shared/cacheRules';
 
 export interface StockQuote {
   price: number;
@@ -11,7 +12,6 @@ export interface StockQuote {
   updatedAt: string;
 }
 
-const REFRESH_INTERVAL = 3 * 60 * 1000; // 3 minutes
 const CACHE_KEY = 'stock_quotes_cache';
 
 function loadCache(): Record<string, StockQuote> {
@@ -32,19 +32,17 @@ export function useStockQuotes(tickers: string[]) {
   const [quotes, setQuotes] = useState<Record<string, StockQuote>>(loadCache);
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const validTickers = tickers.filter(t => t && t.trim().length > 0);
+  const key = validTickers.join(',');
 
-  const fetchQuotes = useCallback(async () => {
+  const doFetch = useCallback(async (force: boolean) => {
     if (validTickers.length === 0) return;
-    
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('stock-quotes', {
-        body: { tickers: validTickers },
+        body: { tickers: validTickers, force },
       });
-
       if (error) throw error;
       if (data?.quotes) {
         setQuotes(prev => {
@@ -59,19 +57,26 @@ export function useStockQuotes(tickers: string[]) {
     } finally {
       setIsLoading(false);
     }
-  }, [validTickers.join(',')]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
-  // Fetch on mount and set interval
   useEffect(() => {
     if (validTickers.length === 0) return;
-
-    fetchQuotes();
-
-    intervalRef.current = setInterval(fetchQuotes, REFRESH_INTERVAL);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+    doFetch(false);
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible' && isTradingHours(new Date())) doFetch(false);
+    }, QUOTE_TTL_MS);
+    const onVis = () => {
+      if (document.visibilityState === 'visible' && isTradingHours(new Date())) doFetch(false);
     };
-  }, [fetchQuotes]);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doFetch]);
 
-  return { quotes, isLoading, lastUpdated, refetch: fetchQuotes };
+  const refetch = useCallback(() => doFetch(true), [doFetch]);
+  return { quotes, isLoading, lastUpdated, refetch };
 }

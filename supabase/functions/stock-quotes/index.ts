@@ -1,3 +1,5 @@
+import { readCache, writeCache } from '../_shared/marketCache.ts';
+import { isQuoteUsable } from '../_shared/cacheRules.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
@@ -14,7 +16,7 @@ Deno.serve(async (req) => {
       throw new Error('BRAPI_API_KEY is not configured');
     }
 
-    const { tickers } = await req.json();
+    const { tickers, force } = await req.json();
 
     if (!tickers || !Array.isArray(tickers) || tickers.length === 0) {
       return new Response(
@@ -37,7 +39,18 @@ Deno.serve(async (req) => {
     // Free Brapi plans allow only 1 ticker per request — fetch sequentially
     const unique = [...new Set(tickers.map((t: string) => String(t).trim().toUpperCase()))].filter(Boolean);
 
-    for (const ticker of unique) {
+    const now = new Date();
+    const cached = await readCache('quote', unique);
+    const toFetch: string[] = [];
+    for (const t of unique) {
+      const row = cached.get(t);
+      if (row && isQuoteUsable(row.fetched_at, now, !!force)) {
+        quotes[t] = row.payload as typeof quotes[string];
+      } else toFetch.push(t);
+    }
+    const fresh: { ticker: string; payload: unknown }[] = [];
+
+    for (const ticker of toFetch) {
       const url = `https://brapi.dev/api/quote/${encodeURIComponent(ticker)}?token=${BRAPI_API_KEY}`;
       const response = await fetch(url);
       const data = await response.json().catch(() => null);
@@ -45,7 +58,9 @@ Deno.serve(async (req) => {
       if (!response.ok || !data?.results?.length) {
         const detail = typeof data?.message === 'string' ? data.message : `HTTP ${response.status}`;
         console.error(`Brapi error for ${ticker}: ${detail}`);
-        errors[ticker] = detail;
+        const stale = cached.get(ticker);
+        if (stale) quotes[ticker] = stale.payload as typeof quotes[string];
+        else errors[ticker] = detail;
         continue;
       }
 
@@ -59,7 +74,9 @@ Deno.serve(async (req) => {
         shortName: result.shortName,
         updatedAt: new Date().toISOString(),
       };
+      fresh.push({ ticker, payload: quotes[result.symbol ?? ticker] });
     }
+    await writeCache('quote', fresh);
 
     if (!Object.keys(quotes).length && Object.keys(errors).length) {
       return new Response(
