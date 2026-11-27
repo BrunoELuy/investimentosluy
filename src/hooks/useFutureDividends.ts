@@ -2,9 +2,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useInvestments } from '@/hooks/useInvestments';
 import { supabase } from '@/integrations/supabase/client';
-import { saveLocalDividends, isOnline } from '@/lib/offlineDb';
+import {
+  saveLocalDividends,
+  isOnline,
+  getLocalOrphanFutureDividends,
+  saveLocalOrphanFutureDividends,
+  deleteLocalOrphanFutureDividends,
+} from '@/lib/offlineDb';
 
-const QUERY_VERSION = 'v5-reconcile-due';
+const QUERY_VERSION = 'v6-orphan-fallback';
 
 // aceita `now` como parâmetro (default = new Date()) para testes
 export function todayInBrazil(now: Date = new Date()): string {
@@ -68,7 +74,6 @@ export function calculateQuantityAtDate(
   return qty; // pode ser negativo; o caller aplica Math.max(0, ...)
 }
 
-// helper puro extraído do queryFn
 export function splitDueAndFuture<T extends { paymentDate: string }>(
   events: T[],
   today: string,
@@ -80,6 +85,80 @@ export function splitDueAndFuture<T extends { paymentDate: string }>(
     else future.push(e);
   }
   return { future, due };
+}
+
+/**
+ * Converte eventos brutos da Edge Function `stock-dividends` em `FutureDividend[]`
+ * usando o histórico de transações ou a quantidade atual como fallback.
+ */
+export function buildFutureDividendsForTicker(
+  ticker: string,
+  dividends: DividendEvent[],
+  txs: StockTransactionLite[],
+  currentQty: number,
+): FutureDividend[] {
+  const normalizedTicker = ticker.toUpperCase();
+  const result: FutureDividend[] = [];
+
+  for (const d of dividends) {
+    if (!d.paymentDate || d.rate == null) continue;
+    if (!d.lastDatePrior && !d.approvedOn) continue;
+
+    const dateCom = (d.lastDatePrior ?? d.approvedOn!).split('T')[0];
+    const paymentDate = d.paymentDate.split('T')[0];
+    const { type, label } = mapRelatedTo(d.relatedTo);
+
+    let qty = calculateQuantityAtDate(txs, dateCom);
+    qty = Math.max(0, qty);
+
+    if (qty <= 0 && txs.length === 0 && currentQty > 0) {
+      qty = currentQty;
+    }
+
+    if (qty <= 0) continue;
+
+    result.push({
+      id: `${normalizedTicker}-${paymentDate}-${d.rate}-${type}`,
+      ticker: normalizedTicker,
+      assetName: d.assetIssued || normalizedTicker,
+      type,
+      typeLabel: label,
+      dateCom,
+      paymentDate,
+      valuePerShare: d.rate,
+      quantityOnDateCom: qty,
+      totalAmount: qty * d.rate,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Seleciona apenas proventos cuja Data-com já passou (`dateCom < today`),
+ * separando os que ainda serão pagos (`futureOrphans`) dos já vencidos (`dueOrphans`).
+ */
+export function filterOrphanCandidates(
+  events: FutureDividend[],
+  today: string,
+): { futureOrphans: FutureDividend[]; dueOrphans: FutureDividend[] } {
+  const postDateCom = events.filter((e) => e.dateCom < today);
+  const { future, due } = splitDueAndFuture(postDateCom, today);
+  return { futureOrphans: future, dueOrphans: due };
+}
+
+/**
+ * Mescla proventos de ações ativas com proventos órfãos preservados.
+ * Em caso de colisão de `id` (ex: usuário recriou a ação), o ativo prevalece.
+ */
+export function mergeFutureDividends(
+  active: FutureDividend[],
+  orphans: FutureDividend[],
+): FutureDividend[] {
+  const byId = new Map<string, FutureDividend>();
+  for (const o of orphans) byId.set(o.id, o);
+  for (const a of active) byId.set(a.id, a);
+  return Array.from(byId.values());
 }
 
 export async function reconcileDueDividends(
@@ -135,6 +214,68 @@ export async function reconcileDueDividends(
   );
 }
 
+/**
+ * Preserva futuros proventos cuja Data-com já passou quando o usuário exclui uma ação.
+ * - Eventos com pagamento futuro ficam salvos em `orphan_future_dividends` para continuar
+ *   aparecendo em Futuros Proventos e serem reconciliados automaticamente quando vencerem.
+ * - Eventos já vencidos são reconciliados imediatamente em `dividend_payments`.
+ */
+export async function preserveOrphanDividendsOnStockDelete(params: {
+  userId: string;
+  ticker: string;
+  quantity: number;
+  cachedFutureDividends?: FutureDividend[];
+  today?: string;
+}): Promise<void> {
+  const normalizedTicker = params.ticker.toUpperCase();
+  const today = params.today ?? todayInBrazil();
+
+  let candidates: FutureDividend[] = (params.cachedFutureDividends ?? []).filter(
+    (d) => d.ticker.toUpperCase() === normalizedTicker,
+  );
+
+  if (candidates.length === 0 && isOnline()) {
+    const [{ data: fnData, error: fnError }, { data: txData, error: txError }] =
+      await Promise.all([
+        supabase.functions.invoke('stock-dividends', {
+          body: { tickers: [normalizedTicker] },
+        }),
+        supabase
+          .from('stock_transactions')
+          .select('operation, quantity, date')
+          .eq('user_id', params.userId)
+          .eq('ticker', normalizedTicker),
+      ]);
+
+    if (fnError) throw fnError;
+    if (txError) throw txError;
+
+    const dividends: DividendEvent[] =
+      fnData?.dividends?.[normalizedTicker] ?? [];
+    const txs = (txData ?? []) as StockTransactionLite[];
+    candidates = buildFutureDividendsForTicker(
+      normalizedTicker,
+      dividends,
+      txs,
+      params.quantity,
+    );
+  }
+
+  if (candidates.length === 0) return;
+
+  const { futureOrphans, dueOrphans } = filterOrphanCandidates(candidates, today);
+
+  if (futureOrphans.length > 0) {
+    await saveLocalOrphanFutureDividends(
+      futureOrphans.map((d) => ({ ...d, user_id: params.userId })),
+    );
+  }
+
+  if (dueOrphans.length > 0) {
+    await reconcileDueDividends(params.userId, dueOrphans);
+  }
+}
+
 export function useFutureDividends() {
   const { user } = useAuth();
   const { data: investments = [] } = useInvestments();
@@ -160,102 +301,90 @@ export function useFutureDividends() {
       positionsSignature,
     ],
     queryFn: async (): Promise<FutureDividend[]> => {
-      if (!user || tickers.length === 0) return [];
+      if (!user) return [];
+
+      const orphans = await getLocalOrphanFutureDividends(user.id);
+      if (tickers.length === 0 && orphans.length === 0) return [];
 
       console.group('[useFutureDividends] Buscando futuros proventos');
       console.log('Tickers:', tickers);
       console.log('Posições:', positionsSignature);
 
-      const { data: fnData, error: fnError } = await supabase.functions.invoke(
-        'stock-dividends',
-        { body: { tickers } },
-      );
-
-      if (fnError) {
-        console.error('[useFutureDividends] Edge function error:', fnError);
-        console.groupEnd();
-        throw new Error(fnError.message);
-      }
-
-      const dividendsByTicker: Record<string, DividendEvent[]> =
-        fnData?.dividends ?? {};
-
-      const { data: txData, error: txError } = await supabase
-        .from('stock_transactions')
-        .select('operation, quantity, date, ticker')
-        .eq('user_id', user.id);
-
-      if (txError) {
-        console.error('[useFutureDividends] Erro ao buscar transações:', txError);
-        console.groupEnd();
-        throw new Error(txError.message);
-      }
-
-      const transactions = (txData ?? []) as (StockTransactionLite & {
-        ticker: string;
-      })[];
-
-      const txByTicker = new Map<string, StockTransactionLite[]>();
-      for (const tx of transactions) {
-        const key = tx.ticker.toUpperCase();
-        if (!txByTicker.has(key)) txByTicker.set(key, []);
-        txByTicker.get(key)!.push(tx);
-      }
-
-      const currentQtyByTicker = new Map<string, number>();
-      for (const s of stocks) {
-        currentQtyByTicker.set(s.ticker!.toUpperCase(), s.quantity ?? 0);
-      }
-
       const all: FutureDividend[] = [];
 
-      for (const [ticker, dividends] of Object.entries(dividendsByTicker)) {
-        const txs = txByTicker.get(ticker) ?? [];
-        const currentQty = currentQtyByTicker.get(ticker) ?? 0;
+      if (tickers.length > 0) {
+        const { data: fnData, error: fnError } = await supabase.functions.invoke(
+          'stock-dividends',
+          { body: { tickers } },
+        );
 
-        for (const d of dividends) {
-          if (!d.paymentDate || d.rate == null) continue;
-          if (!d.lastDatePrior && !d.approvedOn) continue;
+        if (fnError) {
+          console.error('[useFutureDividends] Edge function error:', fnError);
+          console.groupEnd();
+          throw new Error(fnError.message);
+        }
 
-          const dateCom = (d.lastDatePrior ?? d.approvedOn!).split('T')[0];
-          const paymentDate = d.paymentDate.split('T')[0];
-          const { type, label } = mapRelatedTo(d.relatedTo);
+        const dividendsByTicker: Record<string, DividendEvent[]> =
+          fnData?.dividends ?? {};
 
-          // ← Feature 4: usa o helper puro (mesma semântica de antes)
-          let qty = calculateQuantityAtDate(txs, dateCom);
-          qty = Math.max(0, qty);
+        const { data: txData, error: txError } = await supabase
+          .from('stock_transactions')
+          .select('operation, quantity, date, ticker')
+          .eq('user_id', user.id);
 
-          if (qty <= 0 && txs.length === 0 && currentQty > 0) {
-            qty = currentQty;
-          }
+        if (txError) {
+          console.error('[useFutureDividends] Erro ao buscar transações:', txError);
+          console.groupEnd();
+          throw new Error(txError.message);
+        }
 
-          if (qty <= 0) continue;
+        const transactions = (txData ?? []) as (StockTransactionLite & {
+          ticker: string;
+        })[];
 
-          all.push({
-            id: `${ticker}-${paymentDate}-${d.rate}-${type}`,
-            ticker,
-            assetName: d.assetIssued || ticker,
-            type,
-            typeLabel: label,
-            dateCom,
-            paymentDate,
-            valuePerShare: d.rate,
-            quantityOnDateCom: qty,
-            totalAmount: qty * d.rate,
-          });
+        const txByTicker = new Map<string, StockTransactionLite[]>();
+        for (const tx of transactions) {
+          const key = tx.ticker.toUpperCase();
+          if (!txByTicker.has(key)) txByTicker.set(key, []);
+          txByTicker.get(key)!.push(tx);
+        }
+
+        const currentQtyByTicker = new Map<string, number>();
+        for (const s of stocks) {
+          currentQtyByTicker.set(s.ticker!.toUpperCase(), s.quantity ?? 0);
+        }
+
+        for (const [ticker, dividends] of Object.entries(dividendsByTicker)) {
+          const txs = txByTicker.get(ticker) ?? [];
+          const currentQty = currentQtyByTicker.get(ticker) ?? 0;
+          all.push(
+            ...buildFutureDividendsForTicker(ticker, dividends, txs, currentQty),
+          );
         }
       }
 
+      const orphanFutureDividends: FutureDividend[] = orphans.map(
+        ({ user_id: _userId, ...rest }) => rest,
+      );
+      const merged = mergeFutureDividends(all, orphanFutureDividends);
+
       const today = todayInBrazil();
-      const { future, due } = splitDueAndFuture(all, today);
+      const { future, due } = splitDueAndFuture(merged, today);
 
       console.log(
-        `Eventos: ${all.length} · ${future.length} futuros · ${due.length} vencidos (ref. ${today})`,
+        `Eventos: ${merged.length} · ${future.length} futuros · ${due.length} vencidos (ref. ${today})`,
       );
 
       if (due.length > 0) {
         try {
           await reconcileDueDividends(user.id, due);
+          const orphanIds = new Set(orphans.map((o) => o.id));
+          const reconciledOrphanIds = due
+            .map((d) => d.id)
+            .filter((id) => orphanIds.has(id));
+          if (reconciledOrphanIds.length > 0) {
+            await deleteLocalOrphanFutureDividends(reconciledOrphanIds);
+          }
           queryClient.invalidateQueries({ queryKey: ['dividend-payments'] });
         } catch (err) {
           console.error(
@@ -271,7 +400,7 @@ export function useFutureDividends() {
         a.paymentDate.localeCompare(b.paymentDate),
       );
     },
-    enabled: !!user && tickers.length > 0,
+    enabled: !!user,
     staleTime: 12 * 60 * 60 * 1000,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,

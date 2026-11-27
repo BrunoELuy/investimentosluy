@@ -11,6 +11,10 @@ import {
   addToSyncQueue,
   isOnline 
 } from '@/lib/offlineDb';
+import {
+  preserveOrphanDividendsOnStockDelete,
+  type FutureDividend,
+} from '@/hooks/useFutureDividends';
 
 export function useInvestments(filters?: InvestmentFilters) {
   const { user } = useAuth();
@@ -229,6 +233,48 @@ export function useDeleteInvestment() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // Snapshot de futuros proventos pós-Data-com antes de remover a ação
+      try {
+        const cachedLists = queryClient.getQueriesData<Investment[]>({ queryKey: ['investments'] });
+        const allCached = cachedLists.flatMap(([, list]) => list ?? []);
+        let target = allCached.find((inv) => inv.id === id);
+
+        if (!target && isOnline()) {
+          const { data } = await supabase
+            .from('investments')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+          if (data) target = data as Investment;
+        }
+
+        if (target && target.type === 'ACAO' && target.ticker) {
+          const normalizedTicker = target.ticker.toUpperCase();
+          const hasSiblingWithSameTicker = allCached.some(
+            (inv) =>
+              inv.id !== id &&
+              inv.type === 'ACAO' &&
+              inv.ticker?.toUpperCase() === normalizedTicker,
+          );
+
+          if (!hasSiblingWithSameTicker) {
+            const cachedFuture = queryClient
+              .getQueriesData<FutureDividend[]>({ queryKey: ['future-dividends'] })
+              .flatMap(([, list]) => list ?? []);
+
+            await preserveOrphanDividendsOnStockDelete({
+              userId: target.user_id,
+              ticker: normalizedTicker,
+              quantity: target.quantity ?? 0,
+              cachedFutureDividends: cachedFuture.length > 0 ? cachedFuture : undefined,
+            });
+          }
+        }
+      } catch (err) {
+        // Fallback nunca deve impedir a exclusão da ação
+        console.warn('[useDeleteInvestment] Falha ao preservar proventos órfãos:', err);
+      }
+
       if (isOnline()) {
         const { error } = await supabase
           .from('investments')
@@ -252,6 +298,8 @@ export function useDeleteInvestment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investments'] });
+      queryClient.invalidateQueries({ queryKey: ['future-dividends'] });
+      queryClient.invalidateQueries({ queryKey: ['dividend-payments'] });
       toast({
         title: 'Investimento removido',
         description: isOnline() ? 

@@ -11,6 +11,9 @@ vi.mock('@/integrations/supabase/client', () => ({
 vi.mock('@/lib/offlineDb', () => ({
   isOnline: vi.fn(() => true),
   saveLocalDividends: vi.fn(async () => {}),
+  getLocalOrphanFutureDividends: vi.fn(async () => []),
+  saveLocalOrphanFutureDividends: vi.fn(async () => {}),
+  deleteLocalOrphanFutureDividends: vi.fn(async () => {}),
 }));
 
 // useAuth/useInvestments não são exercitados nos testes de função pura,
@@ -20,12 +23,20 @@ vi.mock('@/hooks/useInvestments', () => ({ useInvestments: () => ({ data: [] }) 
 
 // ── Imports após mocks ─────────────────────────────────────────
 import { supabase } from '@/integrations/supabase/client';
-import { isOnline, saveLocalDividends } from '@/lib/offlineDb';
+import {
+  isOnline,
+  saveLocalDividends,
+  saveLocalOrphanFutureDividends,
+} from '@/lib/offlineDb';
 import {
   todayInBrazil,
   mapRelatedTo,
   splitDueAndFuture,
   reconcileDueDividends,
+  buildFutureDividendsForTicker,
+  filterOrphanCandidates,
+  mergeFutureDividends,
+  preserveOrphanDividendsOnStockDelete,
   type FutureDividend,
 } from '@/hooks/useFutureDividends';
 
@@ -233,5 +244,119 @@ describe('reconcileDueDividends', () => {
     ).rejects.toEqual({ message: 'boom' });
     // Não deve ter salvado localmente após erro do upsert
     expect(saveLocalDividends).not.toHaveBeenCalled();
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
+// 5. Fallback de proventos ao deletar ação (Feature 5)
+// ══════════════════════════════════════════════════════════════
+describe('filterOrphanCandidates', () => {
+  it('mantém apenas eventos cuja Data-com já passou (dateCom < today)', () => {
+    const events = [
+      makeDividend({ id: 'past-com-future-pay', dateCom: '2026-11-10', paymentDate: '2026-12-05' }),
+      makeDividend({ id: 'today-com', dateCom: '2026-11-19', paymentDate: '2026-12-05' }),
+      makeDividend({ id: 'future-com', dateCom: '2026-11-25', paymentDate: '2026-12-10' }),
+      makeDividend({ id: 'past-com-due-pay', dateCom: '2026-11-01', paymentDate: '2026-11-15' }),
+    ];
+
+    const { futureOrphans, dueOrphans } = filterOrphanCandidates(events, '2026-11-19');
+    expect(futureOrphans.map((d) => d.id)).toEqual(['past-com-future-pay']);
+    expect(dueOrphans.map((d) => d.id)).toEqual(['past-com-due-pay']);
+  });
+});
+
+describe('mergeFutureDividends', () => {
+  it('mescla ativos e órfãos sem duplicar, com ativo prevalecendo', () => {
+    const orphan = makeDividend({ id: 'dup-1', totalAmount: 100 });
+    const orphanOnly = makeDividend({ id: 'orphan-only', ticker: 'BBSE3' });
+    const active = makeDividend({ id: 'dup-1', totalAmount: 200 });
+
+    const merged = mergeFutureDividends([active], [orphan, orphanOnly]);
+    expect(merged).toHaveLength(2);
+    expect(merged.find((d) => d.id === 'dup-1')?.totalAmount).toBe(200);
+    expect(merged.find((d) => d.id === 'orphan-only')?.ticker).toBe('BBSE3');
+  });
+});
+
+describe('buildFutureDividendsForTicker', () => {
+  it('usa currentQty como fallback quando não há transações', () => {
+    const result = buildFutureDividendsForTicker(
+      'bbse3',
+      [
+        {
+          assetIssued: 'BB SEGURIDADE',
+          lastDatePrior: '2026-11-10T00:00:00',
+          paymentDate: '2026-12-01T00:00:00',
+          rate: 1.5,
+          relatedTo: 'Dividendo',
+        },
+      ],
+      [],
+      100,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      ticker: 'BBSE3',
+      dateCom: '2026-11-10',
+      paymentDate: '2026-12-01',
+      quantityOnDateCom: 100,
+      totalAmount: 150,
+    });
+  });
+});
+
+describe('preserveOrphanDividendsOnStockDelete', () => {
+  const upsertMock = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    upsertMock.mockResolvedValue({ error: null });
+    vi.mocked(supabase.from).mockReturnValue({
+      upsert: upsertMock,
+    } as never);
+    vi.mocked(isOnline).mockReturnValue(true);
+  });
+
+  it('salva órfãos futuros pós-Data-com e reconcilia vencidos a partir do cache', async () => {
+    const cached = [
+      makeDividend({
+        id: 'TIMS3-2026-12-10-0.5-DIVIDENDO',
+        ticker: 'TIMS3',
+        dateCom: '2026-11-15',
+        paymentDate: '2026-12-10',
+      }),
+      makeDividend({
+        id: 'TIMS3-2026-12-20-0.4-JCP',
+        ticker: 'TIMS3',
+        dateCom: '2026-11-25', // ainda não passou da Data-com
+        paymentDate: '2026-12-20',
+      }),
+      makeDividend({
+        id: 'TIMS3-2026-11-18-0.3-DIVIDENDO',
+        ticker: 'TIMS3',
+        dateCom: '2026-11-01',
+        paymentDate: '2026-11-18', // já venceu
+      }),
+    ];
+
+    await preserveOrphanDividendsOnStockDelete({
+      userId: 'user-1',
+      ticker: 'TIMS3',
+      quantity: 240,
+      cachedFutureDividends: cached,
+      today: '2026-11-19',
+    });
+
+    expect(saveLocalOrphanFutureDividends).toHaveBeenCalledTimes(1);
+    expect(saveLocalOrphanFutureDividends).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: 'TIMS3-2026-12-10-0.5-DIVIDENDO',
+        user_id: 'user-1',
+      }),
+    ]);
+
+    expect(upsertMock).toHaveBeenCalledTimes(1);
+    expect(saveLocalDividends).toHaveBeenCalledTimes(1);
   });
 });

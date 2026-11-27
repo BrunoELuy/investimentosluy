@@ -22,6 +22,20 @@ interface SyncQueueItem {
   timestamp: number;
 }
 
+export interface OrphanFutureDividendRecord {
+  id: string;
+  user_id: string;
+  ticker: string;
+  assetName: string;
+  type: 'DIVIDENDO' | 'JCP' | 'OUTRO';
+  typeLabel: string;
+  dateCom: string;
+  paymentDate: string;
+  valuePerShare: number;
+  quantityOnDateCom: number;
+  totalAmount: number;
+}
+
 interface InvestTrackerDB extends DBSchema {
   investments: {
     key: string;
@@ -52,10 +66,15 @@ interface InvestTrackerDB extends DBSchema {
     key: string;
     value: { key: string; value: any };
   };
+  orphan_future_dividends: {
+    key: string;
+    value: OrphanFutureDividendRecord;
+    indexes: { 'by-user': string };
+  };
 }
 
 const DB_NAME = 'investtracker-offline';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbInstance: IDBPDatabase<InvestTrackerDB> | null = null;
 
@@ -99,6 +118,12 @@ export async function getDb(): Promise<IDBPDatabase<InvestTrackerDB>> {
       // Meta store for last sync timestamps
       if (!db.objectStoreNames.contains('meta')) {
         db.createObjectStore('meta', { keyPath: 'key' });
+      }
+
+      // Orphan future dividends store (when a stock is deleted after Data-com)
+      if (!db.objectStoreNames.contains('orphan_future_dividends')) {
+        const orphanStore = db.createObjectStore('orphan_future_dividends', { keyPath: 'id' });
+        orphanStore.createIndex('by-user', 'user_id');
       }
     },
   });
@@ -203,6 +228,36 @@ export async function deleteLocalDividend(id: string): Promise<void> {
   await db.delete('dividend_payments', id);
 }
 
+// ============ Orphan Future Dividends ============
+export async function getLocalOrphanFutureDividends(
+  userId: string,
+): Promise<OrphanFutureDividendRecord[]> {
+  const db = await getDb();
+  return db.getAllFromIndex('orphan_future_dividends', 'by-user', userId);
+}
+
+export async function saveLocalOrphanFutureDividends(
+  records: OrphanFutureDividendRecord[],
+): Promise<void> {
+  if (records.length === 0) return;
+  const db = await getDb();
+  const tx = db.transaction('orphan_future_dividends', 'readwrite');
+  await Promise.all([
+    ...records.map((r) => tx.store.put(r)),
+    tx.done,
+  ]);
+}
+
+export async function deleteLocalOrphanFutureDividends(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const db = await getDb();
+  const tx = db.transaction('orphan_future_dividends', 'readwrite');
+  await Promise.all([
+    ...ids.map((id) => tx.store.delete(id)),
+    tx.done,
+  ]);
+}
+
 // ============ Sync Queue ============
 export async function addToSyncQueue(item: Omit<SyncQueueItem, 'id' | 'timestamp'>): Promise<void> {
   const db = await getDb();
@@ -249,6 +304,7 @@ export async function clearAllLocalData(): Promise<void> {
     db.clear('investment_goals'),
     db.clear('investment_deposits'),
     db.clear('dividend_payments'),
+    db.clear('orphan_future_dividends'),
     db.clear('sync_queue'),
     db.clear('meta'),
   ]);
