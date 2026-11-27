@@ -420,42 +420,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_suggestions: {
-        Row: {
-          created_at: string
-          description: string
-          id: string
-          status: string
-          title: string
-          type: string
-          updated_at: string
-          user_email: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          description: string
-          id?: string
-          status?: string
-          title: string
-          type: string
-          updated_at?: string
-          user_email?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          description?: string
-          id?: string
-          status?: string
-          title?: string
-          type?: string
-          updated_at?: string
-          user_email?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
