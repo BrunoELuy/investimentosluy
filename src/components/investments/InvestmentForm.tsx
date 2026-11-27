@@ -247,7 +247,8 @@ export function InvestmentForm({ investment, onSubmit, onCancel }: InvestmentFor
                     min="0"
                     placeholder="0,00" 
                     {...field}
-                    onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                    value={field.value === 0 ? '' : field.value}
+                    onChange={e => field.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value))}
                   />
                 </FormControl>
                 <FormMessage />
@@ -321,7 +322,8 @@ export function InvestmentForm({ investment, onSubmit, onCancel }: InvestmentFor
                       min="0"
                       placeholder={rateType === 'CDI' ? '110' : '6.00'} 
                       {...field}
-                      onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                      value={field.value === 0 ? '' : field.value}
+                      onChange={e => field.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value))}
                     />
                   </FormControl>
                   <FormDescription>
