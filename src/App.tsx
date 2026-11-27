@@ -14,6 +14,7 @@ import Reports from './pages/Reports';
 import Calculator from './pages/Calculator';
 import InvestmentDetail from './pages/InvestmentDetail';
 import ImportB3 from './pages/ImportB3';
+import Suggestions from './pages/Suggestions';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
               <Route path="/reports" element={<Reports />} />
               <Route path="/calculator" element={<Calculator />} />
               <Route path="/import-b3" element={<ImportB3 />} />
+              <Route path="/suggestions" element={<Suggestions />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

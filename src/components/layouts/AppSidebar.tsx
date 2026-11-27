@@ -7,6 +7,7 @@ import {
   FileText,
   Calculator,
   FileSpreadsheet,
+  Lightbulb,
   LogOut,
 } from 'lucide-react';
 import {
@@ -32,6 +33,7 @@ const MENU_ITEMS = [
   { title: 'Relatórios', url: '/reports', icon: FileText },
   { title: 'Calculador', url: '/calculator', icon: Calculator },
   { title: 'Importação B3', url: '/import-b3', icon: FileSpreadsheet },
+  { title: 'Sugestões', url: '/suggestions', icon: Lightbulb },
 ];
 
 export function AppSidebar() {
