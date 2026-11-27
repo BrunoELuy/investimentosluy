@@ -125,16 +125,6 @@ export function FutureDividendsChart() {
     return { dividendTotal, jcpTotal, allDiv, allJcp };
   }, [yearDividends, dividends, selectedTickers]);
 
-  const perTickerTotals = useMemo(() => {
-    const map: Record<string, { dividendo: number; jcp: number }> = {};
-    for (const d of yearDividends) {
-      if (!map[d.ticker]) map[d.ticker] = { dividendo: 0, jcp: 0 };
-      if (d.type === 'DIVIDENDO') map[d.ticker].dividendo += d.totalAmount;
-      if (d.type === 'JCP') map[d.ticker].jcp += d.totalAmount;
-    }
-    return map;
-  }, [yearDividends]);
-
   if (isLoading) {
     return (
       <Card className="lg:col-span-2">
@@ -274,70 +264,14 @@ export function FutureDividendsChart() {
           </ResponsiveContainer>
         </div>
 
-        {Object.keys(perTickerTotals).length > 0 && (
-          <div className="border rounded-lg overflow-x-auto">
-            <table className="w-full text-xs sm:text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50 text-muted-foreground text-left">
-                  <th className="p-2.5">Ativo</th>
-                  <th className="p-2.5 text-right">Dividendos</th>
-                  <th className="p-2.5 text-right">JCP</th>
-                  <th className="p-2.5 text-right font-semibold">Total {selectedYear}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(perTickerTotals)
-                  .sort(([, a], [, b]) => (b.dividendo + b.jcp) - (a.dividendo + a.jcp))
-                  .map(([ticker, vals]) => {
-                    const color = getTickerColor(allTickers, ticker);
-                    return (
-                      <tr key={ticker} className="border-b last:border-0 hover:bg-muted/20">
-                        <td className="p-2.5">
-                          <span className="font-semibold text-xs px-2 py-0.5 rounded-full text-white"
-                            style={{ backgroundColor: color }}>
-                            {ticker}
-                          </span>
-                        </td>
-                        <td className="p-2.5 text-right font-mono text-emerald-700 dark:text-emerald-400">
-                          {vals.dividendo > 0 ? formatCurrency(vals.dividendo) : '—'}
-                        </td>
-                        <td className="p-2.5 text-right font-mono text-blue-700 dark:text-blue-400">
-                          {vals.jcp > 0 ? formatCurrency(vals.jcp) : '—'}
-                        </td>
-                        <td className="p-2.5 text-right font-bold font-mono">
-                          {formatCurrency(vals.dividendo + vals.jcp)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                <tr className="border-t-2 bg-muted/40 font-bold text-xs">
-                  <td className="p-2.5">Total</td>
-                  <td className="p-2.5 text-right font-mono text-emerald-700 dark:text-emerald-400">
-                    {formatCurrency(totals.dividendTotal)}
-                  </td>
-                  <td className="p-2.5 text-right font-mono text-blue-700 dark:text-blue-400">
-                    {formatCurrency(totals.jcpTotal)}
-                  </td>
-                  <td className="p-2.5 text-right font-mono">
-                    {formatCurrency(totals.dividendTotal + totals.jcpTotal)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-
         {/* Feature 7 — eventos individuais com data de pagamento */}
         {yearDividends.length > 0 && (
           <div className="border rounded-lg overflow-x-auto">
-            <p className="text-xs font-semibold text-muted-foreground px-3 pt-3 pb-1">
-              Calendário de pagamentos — {selectedYear}
-            </p>
             <table className="w-full text-xs sm:text-sm">
               <thead>
                 <tr className="border-b bg-muted/50 text-muted-foreground text-left">
-                  <th className="p-2.5">Pagamento</th>
                   <th className="p-2.5">Ativo</th>
+                  <th className="p-2.5">Pagamento</th>
                   <th className="p-2.5">Tipo</th>
                   <th className="p-2.5 text-right">R$/ação</th>
                   <th className="p-2.5 text-right font-semibold">Total</th>
@@ -352,13 +286,13 @@ export function FutureDividendsChart() {
                     const dateLabel = `${day}/${month}/${year}`;
                     return (
                       <tr key={d.id} className="border-b last:border-0 hover:bg-muted/20">
-                        <td className="p-2.5 font-mono text-xs whitespace-nowrap">{dateLabel}</td>
                         <td className="p-2.5">
                           <span className="font-semibold text-xs px-2 py-0.5 rounded-full text-white"
                             style={{ backgroundColor: color }}>
                             {d.ticker}
                           </span>
                         </td>
+                        <td className="p-2.5 font-mono text-xs whitespace-nowrap">{dateLabel}</td>
                         <td className="p-2.5 text-muted-foreground">{d.typeLabel}</td>
                         <td className="p-2.5 text-right font-mono text-xs">{formatCurrency(d.valuePerShare)}</td>
                         <td className="p-2.5 text-right font-bold font-mono text-emerald-700 dark:text-emerald-400">
