@@ -250,7 +250,7 @@ export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDet
               <Hash className="h-4 w-4 text-[hsl(280,70%,50%)]" />
               <span className="text-sm">Quantidade</span>
             </div>
-            <p className="text-2xl font-bold text-[hsl(280,70%,50%)]">
+            <p className="text-xl md:text-2xl font-bold text-[hsl(280,70%,50%)] truncate">
               {investment.quantity || 0}
             </p>
             <p className="text-xs text-muted-foreground">papéis</p>
@@ -263,7 +263,7 @@ export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDet
               <Coins className="h-4 w-4 text-[hsl(280,70%,50%)]" />
               <span className="text-sm">Preço Médio</span>
             </div>
-            <p className="text-2xl font-bold text-[hsl(280,70%,50%)]">
+            <p className="text-xl md:text-2xl font-bold text-[hsl(280,70%,50%)] truncate">
               {formatCurrency(averagePrice)}
             </p>
             <p className="text-xs text-muted-foreground">por ação</p>
@@ -276,7 +276,7 @@ export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDet
               <DollarSign className="h-4 w-4 text-[hsl(280,70%,50%)]" />
               <span className="text-sm">Total Investido</span>
             </div>
-            <p className="text-2xl font-bold text-[hsl(280,70%,50%)]">
+            <p className="text-xl md:text-2xl font-bold text-[hsl(280,70%,50%)] truncate">
               {formatCurrency(investment.initial_value)}
             </p>
           </CardContent>
@@ -336,16 +336,16 @@ export function StockDetails({ calculation, onBack, onEdit, onDelete }: StockDet
             </div>
             <Separator />
             <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-2xl font-bold text-[hsl(280,70%,50%)]">{investment.quantity || 0}</p>
+              <div className="min-w-0">
+                <p className="text-xl md:text-2xl font-bold text-[hsl(280,70%,50%)] truncate">{investment.quantity || 0}</p>
                 <p className="text-xs text-muted-foreground">Papéis</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-[hsl(280,70%,50%)]">{formatCurrency(averagePrice)}</p>
+              <div className="min-w-0">
+                <p className="text-xl md:text-2xl font-bold text-[hsl(280,70%,50%)] truncate">{formatCurrency(averagePrice)}</p>
                 <p className="text-xs text-muted-foreground">Preço Médio</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-[hsl(280,70%,50%)]">{formatCurrency(investment.initial_value)}</p>
+              <div className="min-w-0">
+                <p className="text-xl md:text-2xl font-bold text-[hsl(280,70%,50%)] truncate">{formatCurrency(investment.initial_value)}</p>
                 <p className="text-xs text-muted-foreground">Total</p>
               </div>
             </div>
